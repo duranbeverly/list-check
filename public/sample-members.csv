@@ -1,0 +1,18 @@
+first_name,last_name,email,phone,opt_out
+Maria,Lopez,Maria.Lopez@example.com,571-555-0101,No
+James,Carter,james.carter@example.com,(571) 555-0102,
+Aisha,Khan,aisha.khan@example.com,5715550103,No
+Tom,Nguyen,tom.nguyen@example.com,15715550104,
+Rosa,Diaz,rosa.diaz@example.com,+15715550105,No
+Kevin,Brooks,kevin.brooks@example.com,555-01,
+Linda,Park,linda.park@example.com,,No
+Maria,Lopez,maria.lopez@example.com,571-555-0108,
+Derek,Miles,derek.miles@example.com,571-555-0110,No
+Derek,Miles,dmiles@example.com,(571) 555-0110,
+Ana,Reyes,ana.reyes@example.com,571-555-0111,
+Luis,Reyes,luis.reyes@example.com,571-555-0111,No
+
+Grace,Kim,grace.kim@example.com,571-555-0113,Yes
+Omar,Hassan,omar.hassan@example.com,571-555-0114,STOP
+Beth,Young,beth.young@example.com,571-555-0115,do not text
+Sam,Lee,sam.lee@example.com,571-555-0116,No
