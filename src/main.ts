@@ -23,8 +23,7 @@ fileInput.addEventListener('change', (event) => {
       throw new Error('Summary paragraph element not found');
     }
    
-   
   }
 }); 
 
-// 
+// Parse the CSV file using PapaParse and skip empty lines  
