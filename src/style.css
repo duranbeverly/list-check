@@ -1,0 +1,22 @@
+#summary {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+#review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-left: 1.5rem;
+}
+
+#review-list li {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+#privacy-note {
+  color: #555;
+  font-size: 14px;
+  margin-top: 1.5rem;
+}
