@@ -10,13 +10,13 @@
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "@types/papaparse": "^5.5.2",
+    "@types/papaparse": "5.5.2",
     "typescript": "~7.0.2",
     "vite": "^8.3.6",
     "vitest": "^5.1.1"
   },
   "dependencies": {
-    "libphonenumber-js": "^1.13.17",
+    "libphonenumber-js": "1.13.17",
     "papaparse": "^5.7.1"
   }
 }

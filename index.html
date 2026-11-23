@@ -7,7 +7,13 @@
     <title>list-check</title>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- Create a label for the file input -->
+      <label for="file-input">Select a CSV file</label>
+      <!-- Add result paragraph -->
+      <p id="summary"></p>
+      <input type="file" id="file-input" accept=".csv">
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
