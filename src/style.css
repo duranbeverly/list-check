@@ -1,8 +1,10 @@
+/* Keep the report easy to scan. */
 #summary {
   font-size: 16px;
   line-height: 1.5;
 }
 
+/* Space review lines so each is easy to read. */
 #review-list {
   display: flex;
   flex-direction: column;
@@ -10,11 +12,13 @@
   padding-left: 1.5rem;
 }
 
+/* Keep review text at a readable size. */
 #review-list li {
   font-size: 16px;
   line-height: 1.4;
 }
 
+/* Keep the privacy note quiet but readable. */
 #privacy-note {
   color: #555;
   font-size: 14px;

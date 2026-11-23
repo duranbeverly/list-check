@@ -8,6 +8,7 @@ import {
   findDuplicates,
   findFatalParseError,
   isOptOut,
+  toCsv,
   toMembers,
 } from '../src/rules';
 import type { RawRow } from '../src/types';
@@ -210,5 +211,33 @@ describe('checkList', () => {
     expect(buckets.optedOut.find((member) => member.row === 12)?.reasons)
       .toContain('shared phone with opted-out row 13');
     expect(buckets.needsReview.some((member) => member.row === 12 || member.row === 13)).toBe(false);
+  });
+});
+
+describe('toCsv', () => {
+  // Keep original values and order while adding unique, safe export columns.
+  it('preserves headers, avoids collisions, and leaves phone_clean importable', () => {
+    const original: RawRow = {
+      first_name: '=HYPERLINK("https://example.com")',
+      email: '+SUM(1,1)',
+      phone: '571-555-0101',
+      phone_clean: 'original phone value',
+      why: 'original reason',
+    };
+    const headers = Object.keys(original);
+    const [member] = toMembers([original], guessColumns(headers));
+    const csv = toCsv([{ ...member, reasons: [] }], headers);
+    const parsed = Papa.parse<RawRow>(csv, { header: true });
+
+    expect(csv.startsWith('\uFEFF')).toBe(true);
+    expect(parsed.meta.fields).toEqual([
+      ...headers,
+      'list_check_phone_clean',
+      'list_check_why',
+    ]);
+    expect(parsed.data[0].first_name).toBe(`'=HYPERLINK("https://example.com")`);
+    expect(parsed.data[0].email).toBe("'+SUM(1,1)");
+    expect(parsed.data[0].list_check_phone_clean).toBe('+15715550101');
+    expect(parsed.data[0].list_check_why).toBe('');
   });
 });

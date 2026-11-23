@@ -1,6 +1,8 @@
+import Papa from 'papaparse';
 import { parsePhoneNumberFromString, validatePhoneNumberLength } from 'libphonenumber-js';
 import type { CountryCode } from 'libphonenumber-js';
 import type {
+  CheckedMember,
   ColumnMapping,
   DuplicateGroup,
   DuplicateKind,
@@ -253,4 +255,41 @@ export function checkList(members: Member[], duplicateGroups: DuplicateGroup[]):
   buckets.optedOut.sort((first, second) => first.row - second.row);
 
   return buckets;
+}
+
+// Add an apostrophe to spreadsheet formulas without changing clean phone numbers.
+function escapeSpreadsheetFormula(value: string): string {
+  return /^[=+\-@]/.test(value) ? `'${value}` : value;
+}
+
+// Export a checked bucket without changing its original columns or their order.
+export function toCsv(bucket: CheckedMember[], headers: string[]): string {
+  const usedHeaders = new Set(headers.map((header) => header.trim().toLowerCase()));
+
+  const createColumnName = (name: string): string => {
+    let candidate = name;
+    if (usedHeaders.has(candidate.toLowerCase())) {
+      candidate = `list_check_${name}`;
+      let suffix = 2;
+      while (usedHeaders.has(candidate.toLowerCase())) {
+        candidate = `list_check_${name}_${suffix}`;
+        suffix += 1;
+      }
+    }
+
+    usedHeaders.add(candidate.toLowerCase());
+    return candidate;
+  };
+
+  const phoneCleanHeader = createColumnName('phone_clean');
+  const whyHeader = createColumnName('why');
+  const fields = [...headers, phoneCleanHeader, whyHeader];
+  const data = bucket.map((member) => [
+    ...headers.map((header) => escapeSpreadsheetFormula(member.original[header] ?? '')),
+    member.phone.ok ? member.phone.phone : '',
+    escapeSpreadsheetFormula(member.reasons.join('; ')),
+  ]);
+  const csv = Papa.unparse({ fields, data }, { escapeFormulae: false });
+
+  return `\uFEFF${csv}`;
 }
