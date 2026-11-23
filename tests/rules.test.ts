@@ -2,17 +2,23 @@ import { readFileSync } from 'node:fs';
 import Papa from 'papaparse';
 import { describe, expect, it } from 'vitest';
 import { guessColumns } from '../src/columns';
-import { cleanPhone, findDuplicates, findFatalParseError, toMembers } from '../src/rules';
+import {
+  checkList,
+  cleanPhone,
+  findDuplicates,
+  findFatalParseError,
+  isOptOut,
+  toMembers,
+} from '../src/rules';
 import type { RawRow } from '../src/types';
 
 // Load the real sample with blank lines preserved for accurate row numbers.
-function parseSample() {
-  const csv = readFileSync(new URL('../public/sample-members.csv', import.meta.url), 'utf8');
+function parseSample(csv = readFileSync(new URL('../public/sample-members.csv', import.meta.url), 'utf8')) {
   return Papa.parse<RawRow>(csv, { header: true, skipEmptyLines: false });
 }
 
-function loadSampleMembers() {
-  const results = parseSample();
+function loadSampleMembers(csv?: string) {
+  const results = parseSample(csv);
   const columns = guessColumns(results.meta.fields ?? []);
 
   return toMembers(results.data, columns);
@@ -148,5 +154,61 @@ describe('findDuplicates', () => {
       { kind: 'same email', key: 'josé@example.com' },
       { kind: 'same phone', key: '+15715550101' },
     ]);
+  });
+});
+
+describe('isOptOut', () => {
+  // Recognize common ways to say no to texts.
+  it.each(['yes', 'Y', 'true', '1', 'STOP', 'do not text', 'unsubscribe', 'unsubscribed', 'opted out', 'opt out'])(
+    'treats %j as opted out',
+    (value) => {
+      expect(isOptOut(value)).toBe(true);
+    },
+  );
+
+  // Recognize clear answers that allow texts.
+  it.each(['', '   ', 'no', 'N', 'false', '0'])('treats %j as not opted out', (value) => {
+    expect(isOptOut(value)).toBe(false);
+  });
+
+  // Ask for human review when consent is unclear.
+  it('returns a reason for an unfamiliar answer', () => {
+    expect(isOptOut(' maybe ')).toEqual({
+      needsReview: true,
+      why: 'Opt-out value "maybe" is unclear.',
+    });
+  });
+});
+
+describe('checkList', () => {
+  // Put each sample member in exactly one safety bucket.
+  it('separates ready, review, and opted-out members', () => {
+    const members = loadSampleMembers();
+    const buckets = checkList(members, findDuplicates(members));
+
+    expect(buckets.optedOut.map((member) => member.firstName)).toEqual(['Grace', 'Omar', 'Beth']);
+    expect(buckets.needsReview.map((member) => member.row)).toEqual([2, 7, 8, 9, 10, 11, 12, 13]);
+    expect(buckets.ready.map((member) => member.row)).toEqual([3, 4, 5, 6, 18]);
+    expect(buckets.needsReview.find((member) => member.row === 7)?.reasons).toContain('phone too short');
+    expect(buckets.needsReview.find((member) => member.row === 8)?.reasons).toContain('phone missing');
+    expect(buckets.needsReview.find((member) => member.row === 2)?.reasons).toContain('same email as row 9');
+
+    const allMembers = [...buckets.ready, ...buckets.needsReview, ...buckets.optedOut];
+    expect(allMembers).toHaveLength(16);
+    expect(new Set(allMembers.map((member) => member.row)).size).toBe(16);
+  });
+
+  // Apply a STOP to everyone sharing the number, not only its row.
+  it('opts Ana out when Luis sharing her phone says STOP', () => {
+    const csv = readFileSync(new URL('../public/sample-members.csv', import.meta.url), 'utf8')
+      .replace('Luis,Reyes,luis.reyes@example.com,571-555-0111,No', 'Luis,Reyes,luis.reyes@example.com,571-555-0111,STOP');
+    const members = loadSampleMembers(csv);
+    const buckets = checkList(members, findDuplicates(members));
+
+    expect(buckets.optedOut.filter((member) => member.row === 12 || member.row === 13).map((member) => member.row))
+      .toEqual([12, 13]);
+    expect(buckets.optedOut.find((member) => member.row === 12)?.reasons)
+      .toContain('shared phone with opted-out row 13');
+    expect(buckets.needsReview.some((member) => member.row === 12 || member.row === 13)).toBe(false);
   });
 });

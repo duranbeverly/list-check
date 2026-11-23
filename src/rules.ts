@@ -1,6 +1,15 @@
 import { parsePhoneNumberFromString, validatePhoneNumberLength } from 'libphonenumber-js';
 import type { CountryCode } from 'libphonenumber-js';
-import type { ColumnMapping, DuplicateGroup, DuplicateKind, Member, PhoneResult, RawRow } from './types';
+import type {
+  ColumnMapping,
+  DuplicateGroup,
+  DuplicateKind,
+  Member,
+  MemberBuckets,
+  OptOutDecision,
+  PhoneResult,
+  RawRow,
+} from './types';
 
 // Normalize a phone number to the format used for texting.
 export function cleanPhone(value: string, country: CountryCode = 'US'): PhoneResult {
@@ -27,6 +36,22 @@ export function cleanPhone(value: string, country: CountryCode = 'US'): PhoneRes
   return { ok: true, phone: parsedPhone.number };
 }
 
+// Never infer consent from an unfamiliar opt-out value.
+export function isOptOut(value: string): OptOutDecision {
+  const trimmedValue = value.trim();
+  const normalizedValue = trimmedValue.toLowerCase();
+
+  if (['yes', 'y', 'true', '1', 'stop', 'do not text', 'unsubscribe', 'unsubscribed', 'opted out', 'opt out'].includes(normalizedValue)) {
+    return true;
+  }
+
+  if (['', 'no', 'n', 'false', '0'].includes(normalizedValue)) {
+    return false;
+  }
+
+  return { needsReview: true, why: `Opt-out value "${trimmedValue}" is unclear.` };
+}
+
 // Turn parsed rows into members while keeping their file positions and originals.
 export function toMembers(rows: RawRow[], columns: ColumnMapping): Member[] {
   return rows.flatMap((original, index) => {
@@ -42,6 +67,7 @@ export function toMembers(rows: RawRow[], columns: ColumnMapping): Member[] {
       firstName: readValue(columns.firstName),
       lastName: readValue(columns.lastName),
       email: readValue(columns.email),
+      optOut: readValue(columns.optOut),
       phone: cleanPhone(readValue(columns.phone)),
       original,
     }];
@@ -65,12 +91,12 @@ function isBlankRow(row: RawRow): boolean {
 }
 
 // Add each member to the group for a matching key.
-function addToGroup(groups: Map<string, Member[]>, key: string, member: Member): void {
+function addToGroup<T>(groups: Map<string, T[]>, key: string, item: T): void {
   const group = groups.get(key);
   if (group) {
-    group.push(member);
+    group.push(item);
   } else {
-    groups.set(key, [member]);
+    groups.set(key, [item]);
   }
 }
 
@@ -127,6 +153,7 @@ export function findDuplicates(members: Member[]): DuplicateGroup[] {
         rows: [...rows].sort((first, second) => first.row - second.row),
       });
     }
+
   }
 
   for (const [key, rows] of phoneGroups) {
@@ -149,4 +176,81 @@ export function findDuplicates(members: Member[]): DuplicateGroup[] {
 
     return compareText(first.kind, second.kind) || compareText(first.key, second.key);
   });
+}
+
+// Put each member in exactly one safety bucket and explain the decision.
+export function checkList(members: Member[], duplicateGroups: DuplicateGroup[]): MemberBuckets {
+  const optOutByRow = new Map<number, OptOutDecision>();
+  const optedOutRowsByPhone = new Map<string, number[]>();
+
+  for (const member of members) {
+    const decision = isOptOut(member.optOut);
+    optOutByRow.set(member.row, decision);
+
+    if (member.phone.ok && decision === true) {
+      addToGroup(optedOutRowsByPhone, member.phone.phone, member.row);
+    }
+  }
+
+  const buckets: MemberBuckets = { ready: [], needsReview: [], optedOut: [] };
+
+  for (const member of members) {
+    const decision = optOutByRow.get(member.row) ?? false;
+    const sharedOptOutRows = member.phone.ok
+      ? (optedOutRowsByPhone.get(member.phone.phone) ?? [])
+        .filter((row) => row !== member.row)
+        .sort((first, second) => first - second)
+      : [];
+    const reasons: string[] = [];
+
+    if (!member.phone.ok) {
+      reasons.push(`phone ${member.phone.why}`);
+    }
+    if (decision !== true && typeof decision === 'object') {
+      reasons.push(decision.why);
+    }
+
+    const memberGroups = duplicateGroups
+      .filter((group) => group.rows.some((row) => row.row === member.row))
+      .sort((first, second) => first.rows[0].row - second.rows[0].row
+        || compareText(first.kind, second.kind)
+        || compareText(first.key, second.key));
+
+    for (const group of memberGroups) {
+      const otherRows = group.rows
+        .filter((row) => row.row !== member.row)
+        .sort((first, second) => first.row - second.row);
+
+      for (const other of otherRows) {
+        const reason = group.kind === 'same email'
+          ? `same email as row ${other.row}`
+          : group.kind === 'same phone'
+            ? `same phone as row ${other.row}`
+            : `shared phone with row ${other.row}`;
+        reasons.push(reason);
+      }
+    }
+
+    if (decision === true) {
+      reasons.push(`opted out: ${member.optOut.trim()}`);
+    }
+    for (const row of sharedOptOutRows) {
+      reasons.push(`shared phone with opted-out row ${row}`);
+    }
+
+    const checkedMember = { ...member, reasons };
+    if (decision === true || sharedOptOutRows.length > 0) {
+      buckets.optedOut.push(checkedMember);
+    } else if (!member.phone.ok || typeof decision === 'object' || reasons.length > 0) {
+      buckets.needsReview.push(checkedMember);
+    } else {
+      buckets.ready.push(checkedMember);
+    }
+  }
+
+  buckets.ready.sort((first, second) => first.row - second.row);
+  buckets.needsReview.sort((first, second) => first.row - second.row);
+  buckets.optedOut.sort((first, second) => first.row - second.row);
+
+  return buckets;
 }
