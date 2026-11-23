@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <style>
+    :root {
+      --color-brand: #1f6f78;
+      --color-brand-tint: #e6f2f2;
+      --color-page: #f6f5f2;
+      --color-surface: #ffffff;
+      --color-text: #1f2a2e;
+      --color-muted: #55636a;
+      --color-ready: #315a46;
+      --color-ready-tint: #e8f0e9;
+      --color-review: #71520b;
+      --color-review-tint: #f5efd9;
+      --color-opted-out: #8c3b32;
+      --color-opted-out-tint: #f5e7e4;
+    }
+    text {
+      font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
+    }
+  </style>
+  <rect width="1200" height="630" fill="var(--color-page)" />
+  <rect x="64" y="40" width="1072" height="550" rx="12" fill="var(--color-surface)" />
+  <rect x="96" y="72" width="48" height="48" rx="10" fill="var(--color-brand)" />
+  <path d="m132 86-22 22-12-12" fill="none" stroke="var(--color-surface)" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" />
+  <text x="160" y="106" fill="var(--color-text)" font-size="25" font-weight="700">list-check</text>
+  <text x="96" y="214" fill="var(--color-text)" font-size="39" font-weight="700">Make a member list safe to text</text>
+  <text x="96" y="254" fill="var(--color-muted)" font-size="20">A clean import list, clear review notes, and opt-outs kept out.</text>
+
+  <rect x="96" y="304" width="320" height="160" rx="12" fill="var(--color-ready-tint)" />
+  <path d="M121 344a12 12 0 1 1 24 0 12 12 0 0 1-24 0Z" fill="none" stroke="var(--color-ready)" stroke-width="2" />
+  <path d="m140 338-9 10-5-5" fill="none" stroke="var(--color-ready)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+  <text x="158" y="354" fill="var(--color-ready)" font-size="20" font-weight="700">Ready</text>
+  <text x="120" y="425" fill="var(--color-ready)" font-size="39" font-weight="700">5 people</text>
+
+  <rect x="440" y="304" width="320" height="160" rx="12" fill="var(--color-review-tint)" />
+  <path d="m453 354 13-23 13 23h-26Z" fill="none" stroke="var(--color-review)" stroke-linejoin="round" stroke-width="2" />
+  <path d="M466 338v6m0 4h.01" fill="none" stroke="var(--color-review)" stroke-linecap="round" stroke-width="2" />
+  <text x="490" y="354" fill="var(--color-review)" font-size="20" font-weight="700">To review</text>
+  <text x="464" y="425" fill="var(--color-review)" font-size="39" font-weight="700">8 people</text>
+
+  <rect x="784" y="304" width="320" height="160" rx="12" fill="var(--color-opted-out-tint)" />
+  <circle cx="822" cy="344" r="12" fill="none" stroke="var(--color-opted-out)" stroke-width="2" />
+  <path d="m814 336 16 16" fill="none" stroke="var(--color-opted-out)" stroke-linecap="round" stroke-width="2" />
+  <text x="850" y="354" fill="var(--color-opted-out)" font-size="20" font-weight="700">Opted out</text>
+  <text x="808" y="425" fill="var(--color-opted-out)" font-size="39" font-weight="700">3 people</text>
+
+  <text x="96" y="532" fill="var(--color-brand)" font-size="16">Runs on your computer. Nothing is uploaded.</text>
+</svg>

@@ -1,31 +1,164 @@
 <!doctype html>
 <html lang="en">
-  <!-- Set the page name and mobile layout. -->
   <head>
     <meta charset="UTF-8" />
-    
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>list-check</title>
+    <meta
+      name="description"
+      content="Check member lists before texting. Clean phone numbers, review duplicates, and keep opt-outs out, all on your computer."
+    />
+    <meta name="theme-color" content="#1f6f78" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#142022" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://duranbeverly.github.io/list-check/" />
+    <meta property="og:title" content="list-check · Make a member list safe to text" />
+    <meta
+      property="og:description"
+      content="Clean phone numbers, review duplicates, and keep opt-outs out before texting."
+    />
+    <meta
+      property="og:image"
+      content="https://duranbeverly.github.io/list-check/og-image.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <title>list-check · Make a member list safe to text</title>
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%apple-touch-icon.png" />
   </head>
   <body>
-    <!-- Let visitors upload a CSV or try the sample list. -->
     <main id="app">
-      <h1>List Check</h1>
-      <label for="file-input">Select a CSV file</label>
-      <input type="file" id="file-input" accept=".csv">
-      <button type="button" id="sample-button">Try it with a sample list</button>
-      <p id="summary" aria-live="polite"></p>
-      <!-- Show people who need a human check. -->
-      <h2 id="review-heading">People to review</h2>
-      <ul id="review-list" aria-labelledby="review-heading" aria-live="polite"></ul>
-      <!-- Let organizers download each list separately. -->
-      <button type="button" id="download-ready" disabled>Download ready list (to import)</button>
-      <button type="button" id="download-review" disabled>Download people to review (to fix)</button>
-      <button type="button" id="download-opted-out" disabled>Download opt-outs (to keep out)</button>
-      <!-- Explain where the list is processed. -->
-      <p id="privacy-note">Checked on your computer. Nothing was uploaded.</p>
+      <!-- Keep the app name visible in both steps. -->
+      <header class="site-header">
+        <a class="wordmark" href="%BASE_URL%" aria-label="list-check home">
+          <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="1" y="1" width="22" height="22" rx="5" fill="var(--color-brand)" />
+            <path d="m20 6-11 11-5-5" fill="none" stroke="var(--color-surface)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+          </svg>
+          <span>list-check</span>
+        </a>
+      </header>
+
+      <!-- Help visitors choose a list and understand what the tool does. -->
+      <section id="choose-card" class="card" aria-labelledby="hero-title">
+        <p class="step-label">Step 1 · Choose your list</p>
+        <h1 id="hero-title" class="hero-title">Make a member list safe to text</h1>
+        <p class="hero-subhead">Drop in a spreadsheet. Get back a clean list, the people to check, and everyone who opted out.</p>
+        <p id="privacy-note" class="privacy-note">Runs on your computer. Nothing is uploaded.</p>
+        <ul class="benefits" aria-label="What List Check does">
+          <li>
+            <svg class="benefit-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+            </svg>
+            <span>Cleans phone numbers</span>
+          </li>
+          <li>
+            <svg class="benefit-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+            </svg>
+            <span>Flags duplicates</span>
+          </li>
+          <li>
+            <svg class="benefit-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+            </svg>
+            <span>Keeps opt-outs out</span>
+          </li>
+        </ul>
+
+        <!-- Keep the real file input keyboard and screen-reader accessible. -->
+        <input id="file-input" class="visually-hidden" type="file" accept=".csv" aria-describedby="upload-hint">
+        <label id="upload-zone" class="upload-zone" for="file-input">
+          <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
+            <path d="M14 2v4a2 2 0 0 0 2 2h4m-8 4v6m3-3-3-3-3 3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+          </svg>
+          <strong>Drop your CSV here</strong>
+          <span>or choose a file</span>
+          <span class="upload-action">Choose a file</span>
+          <span id="upload-hint" class="upload-hint">CSV files only.</span>
+        </label>
+        <p id="selected-file" class="selected-file" hidden></p>
+        <button id="choose-different-file" class="link-button" type="button" hidden>Choose a different file</button>
+        <p id="file-status" class="file-status" aria-live="polite"></p>
+        <button id="sample-button" class="link-button sample-link" type="button">Try it with a sample list</button>
+      </section>
+
+      <!-- Show the report only after a list has been checked. -->
+      <section id="results-card" class="card" aria-labelledby="results-title" hidden>
+        <p class="step-label">Step 2 · Results</p>
+        <h1 id="results-title" class="results-title">Your list is checked</h1>
+        <p id="checked-file-name" class="checked-file-name"></p>
+        <p id="summary" class="report-headline" aria-live="polite"></p>
+
+        <div class="stat-tiles" aria-label="List results">
+          <div id="ready-tile" class="stat-tile stat-tile--ready">
+            <span class="stat-number">
+              <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+              </svg>
+              <span id="ready-count"></span>
+            </span>
+            <span class="stat-label">Ready</span>
+          </div>
+          <div id="review-tile" class="stat-tile stat-tile--review">
+            <span class="stat-number">
+              <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m10.29 3.86-8.2 14.14A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.73-3l-8.2-14.14a2 2 0 0 0-3.42 0Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
+                <path d="M12 9v4m0 4h.01" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+              </svg>
+              <span id="review-count"></span>
+            </span>
+            <span class="stat-label">To review</span>
+          </div>
+          <div id="opted-out-tile" class="stat-tile stat-tile--opted-out">
+            <span class="stat-number">
+              <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="m4.9 4.9 14.2 14.2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+              </svg>
+              <span id="opted-out-count"></span>
+            </span>
+            <span class="stat-label">Opted out</span>
+          </div>
+        </div>
+
+        <p id="next-step" class="next-step"></p>
+
+        <!-- Offer one clear primary action, followed by secondary downloads. -->
+        <div class="download-actions">
+          <button type="button" id="download-ready" class="button-primary" hidden></button>
+          <button type="button" id="download-review" class="button-secondary" hidden></button>
+          <button type="button" id="download-opted-out" class="button-secondary" hidden></button>
+          <button type="button" id="check-another" class="link-button">Check another file</button>
+        </div>
+
+        <!-- Compare review reasons in a table that also stacks on small screens. -->
+        <section class="review-section" aria-labelledby="review-heading">
+          <h2 id="review-heading">People to review</h2>
+          <p id="review-empty" class="review-empty" hidden></p>
+          <div class="review-table-wrap">
+            <table id="review-table" class="review-table" hidden>
+              <caption id="review-caption"></caption>
+              <thead>
+                <tr>
+                  <th scope="col">Row</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">What to check</th>
+                </tr>
+              </thead>
+              <tbody id="review-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+      </section>
     </main>
-    <!-- Start the app. -->
+    <footer class="site-footer">
+      <p>Built by Beverly Duran · <a href="https://github.com/duranbeverly/list-check">View the code on GitHub</a></p>
+    </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

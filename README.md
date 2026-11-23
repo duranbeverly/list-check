@@ -1,6 +1,14 @@
-# List Check
+# list-check
+
+![list-check checkmark mark](./public/favicon.svg)
 
 A small tool for checking contact lists before texting.
+
+## Voice and brand
+
+Use plain, calm, reassuring language. Say “people,” not “records,” and always tell organizers what to do next. The checkmark in a rounded square is the app mark; keep it consistent across the header and favicon.
+
+See [BRAND.md](./BRAND.md) for the shared palette, type, icon, spacing, shape, and motion rules.
 
 ## Decisions
 

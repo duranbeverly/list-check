@@ -7,24 +7,33 @@ test.beforeEach(async ({ page }) => {
   await page.goto('./');
 });
 
-// Show the sample counts and review details.
-test('reports the sample list results', async ({ page }) => {
+test('shows the sample report and review table', async ({ page }) => {
+  await expect(page.locator('#results-card')).toBeHidden();
   await page.getByRole('button', { name: 'Try it with a sample list' }).click();
 
-  await expect(page.locator('#summary')).toContainText('5 people are ready to import.');
-  await expect(page.locator('#summary')).toContainText('8 need a quick look');
-  await expect(page.locator('#summary')).toContainText('3 opted out');
-  await expect(page.locator('#review-list li')).toHaveCount(8);
-  await expect(page.locator('#review-list li').first()).toContainText('Row 2 · Maria Lopez: same email as row 9');
+  await expect(page.locator('#summary')).toHaveText('5 people are ready to import.');
+  await expect(page.locator('#ready-count')).toHaveText('5');
+  await expect(page.locator('#review-count')).toHaveText('8');
+  await expect(page.locator('#opted-out-count')).toHaveText('3');
+  await expect(page.locator('#review-table-body tr')).toHaveCount(8);
+  await expect(page.locator('#review-table-body tr').first()).toContainText('Row 2');
+  await expect(page.locator('#review-table-body tr').first()).toContainText('Maria Lopez');
+  await expect(page.locator('#review-table-body tr').first()).toContainText(
+    'Same email as row 9. Keep one.',
+  );
+  await expect(page.locator('#download-ready')).toHaveClass(/button-primary/);
+  await expect(page.locator('#download-review')).toHaveClass(/button-secondary/);
+  await expect(page.locator('#download-opted-out')).toHaveClass(/button-secondary/);
+  await expect(page.locator('.button-primary:visible')).toHaveCount(1);
 });
 
-// Download the ready group with its original and added columns.
 test('downloads five ready members with why as the last column', async ({ page }) => {
   await page.getByRole('button', { name: 'Try it with a sample list' }).click();
-  await expect(page.getByRole('button', { name: 'Download ready list (to import)' })).toBeEnabled();
+  const readyButton = page.getByRole('button', { name: 'Download ready list (5)' });
+  await expect(readyButton).toBeVisible();
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download ready list (to import)' }).click();
+  await readyButton.click();
   const download = await downloadPromise;
   const path = await download.path();
 
@@ -39,7 +48,6 @@ test('downloads five ready members with why as the last column', async ({ page }
   expect(parsed.meta.fields?.at(-1)).toBe('why');
 });
 
-// Allow an organizer to select a corrected file with the same name.
 test('rechecks the same file name and updates the report', async ({ page }) => {
   const input = page.locator('#file-input');
   const readyCsv = 'first_name,last_name,email,phone,opt_out\nAlex,Member,alex@example.com,571-555-0101,No';
@@ -50,7 +58,7 @@ test('rechecks the same file name and updates the report', async ({ page }) => {
     mimeType: 'text/csv',
     buffer: Buffer.from(readyCsv),
   });
-  await expect(page.locator('#summary')).toContainText('1 person is ready to import.');
+  await expect(page.locator('#summary')).toHaveText('Everyone looks ready to import.');
   await expect(input).toHaveValue('');
 
   await input.setInputFiles({
@@ -58,11 +66,13 @@ test('rechecks the same file name and updates the report', async ({ page }) => {
     mimeType: 'text/csv',
     buffer: Buffer.from(optedOutCsv),
   });
-  await expect(page.locator('#summary')).toContainText('Everyone on this list has opted out.');
-  await expect(page.locator('#summary')).toContainText('1 opted out');
+  await expect(page.locator('#summary')).toHaveText(
+    'Everyone on this list has opted out. No one is ready to import.',
+  );
+  await expect(page.locator('#opted-out-count')).toHaveText('1');
+  await expect(page.locator('#review-table')).toBeHidden();
 });
 
-// Explain when a file has no way to contact its members.
 test('shows a friendly message when phone and email columns are missing', async ({ page }) => {
   await page.locator('#file-input').setInputFiles({
     name: 'missing-contact.csv',
@@ -70,26 +80,31 @@ test('shows a friendly message when phone and email columns are missing', async 
     buffer: Buffer.from('first_name,last_name\nAlex,Member'),
   });
 
-  await expect(page.locator('#summary')).toContainText('No phone or email column was found');
+  await expect(page.locator('#file-status')).toHaveText(
+    'Could not find a phone or email column. Add one and try again.',
+  );
+  await expect(page.locator('#results-card')).toBeHidden();
 });
 
-// Keep downloads unavailable until a file has been checked.
-test('disables downloads before a file is checked', async ({ page }) => {
-  await expect(page.getByRole('button', { name: 'Download ready list (to import)' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Download people to review (to fix)' })).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Download opt-outs (to keep out)' })).toBeDisabled();
+test('keeps results and downloads hidden before a file is checked', async ({ page }) => {
+  await expect(page.locator('#results-card')).toBeHidden();
+  await expect(page.locator('#download-ready')).toBeHidden();
+  await expect(page.locator('#download-review')).toBeHidden();
+  await expect(page.locator('#download-opted-out')).toBeHidden();
+  await expect(page.locator('.upload-action')).toBeVisible();
 });
 
-// Keep keyboard focus visible and the buttons in a useful order.
 test('supports keyboard navigation with a visible focus outline', async ({ page }) => {
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.wordmark')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.locator('#file-input')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Try it with a sample list' })).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.locator('#summary')).toContainText('5 people are ready to import.');
+  await expect(page.locator('#summary')).toHaveText('5 people are ready to import.');
 
-  const readyButton = page.getByRole('button', { name: 'Download ready list (to import)' });
+  const readyButton = page.getByRole('button', { name: 'Download ready list (5)' });
   await page.keyboard.press('Tab');
   await expect(readyButton).toBeFocused();
   expect(await readyButton.evaluate((button) => getComputedStyle(button).outlineStyle)).toBe('solid');
@@ -97,28 +112,32 @@ test('supports keyboard navigation with a visible focus outline', async ({ page 
   const readyDownload = page.waitForEvent('download');
   await page.keyboard.press('Space');
   await readyDownload;
+
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Download people to review (to fix)' })).toBeFocused();
+  const reviewButton = page.getByRole('button', { name: 'Download to review (8)' });
+  await expect(reviewButton).toBeFocused();
   const reviewDownload = page.waitForEvent('download');
   await page.keyboard.press('Enter');
   await reviewDownload;
+
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Download opt-outs (to keep out)' })).toBeFocused();
+  const optedOutButton = page.getByRole('button', { name: 'Download opt-outs (3)' });
+  await expect(optedOutButton).toBeFocused();
   const optedOutDownload = page.waitForEvent('download');
   await page.keyboard.press('Space');
   await optedOutDownload;
 });
 
-// Keep text and controls usable at phone width and 200% zoom.
-test('fits a phone-width screen at 200% zoom with large tap targets', async ({ page }) => {
+test('fits a phone-width screen at 200% zoom and supports dark mode', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Try it with a sample list' }).click();
-  await expect(page.locator('#summary')).toContainText('5 people are ready to import.');
+  await expect(page.locator('#summary')).toHaveText('5 people are ready to import.');
 
-  const tapTargetHeights = await page.locator('#file-input, #app > button').evaluateAll((elements) =>
-    elements.map((element) => element.getBoundingClientRect().height),
+  const buttonHeights = await page.locator('button:visible').evaluateAll((buttons) =>
+    buttons.map((button) => button.getBoundingClientRect().height),
   );
-  expect(tapTargetHeights.every((height) => height >= 44)).toBe(true);
+  expect(buttonHeights.every((height) => height >= 44)).toBe(true);
+  await expect(page.locator('#review-table td[data-label="Row"]').first()).toHaveCSS('display', 'grid');
 
   await page.evaluate(() => {
     document.documentElement.style.zoom = '200%';
@@ -128,18 +147,23 @@ test('fits a phone-width screen at 200% zoom with large tap targets', async ({ p
     scroll: document.documentElement.scrollWidth,
   }));
   expect(pageWidths.scroll).toBeLessThanOrEqual(pageWidths.client);
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+  const [pageBackground, cardBackground] = await page.evaluate(() => [
+    getComputedStyle(document.documentElement).backgroundColor,
+    getComputedStyle(document.querySelector('.card')!).backgroundColor,
+  ]);
+  expect(pageBackground).not.toBe(cardBackground);
 });
 
-// Catch accessibility issues in the rendered report.
 test('has no axe accessibility violations', async ({ page }) => {
   await page.getByRole('button', { name: 'Try it with a sample list' }).click();
-  await expect(page.locator('#summary')).toContainText('5 people are ready to import.');
+  await expect(page.locator('#summary')).toHaveText('5 people are ready to import.');
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
 });
 
-// Ignore a sample request if a newer file is checked first.
 test('keeps the newer report when a sample request finishes late', async ({ page }) => {
   let releaseSample: () => void = () => {};
   let markSampleRequested: () => void = () => {};
@@ -163,10 +187,11 @@ test('keeps the newer report when a sample request finishes late', async ({ page
     mimeType: 'text/csv',
     buffer: Buffer.from('first_name,last_name,email,phone,opt_out\nAlex,Member,alex@example.com,571-555-0101,No'),
   });
-  await expect(page.locator('#summary')).toContainText('1 person is ready to import.');
+  await expect(page.locator('#summary')).toHaveText('Everyone looks ready to import.');
 
   const sampleResponse = page.waitForResponse((response) => response.url().includes('sample-members.csv'));
   releaseSample();
   await sampleResponse;
-  await expect(page.locator('#summary')).toContainText('1 person is ready to import.');
+  await expect(page.locator('#summary')).toHaveText('Everyone looks ready to import.');
+  await expect(page.locator('#checked-file-name')).toHaveText('newer.csv');
 });

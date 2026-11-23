@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <style>
+    :root {
+      --color-brand: #1f6f78;
+      --color-surface: #ffffff;
+    }
+  </style>
+  <rect x="10" y="10" width="160" height="160" rx="36" fill="var(--color-brand)" />
+  <path d="m145 48-69 69-37-37" fill="none" stroke="var(--color-surface)" stroke-linecap="round" stroke-linejoin="round" stroke-width="15" />
+</svg>
