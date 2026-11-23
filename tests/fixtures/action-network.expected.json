@@ -1,0 +1,8 @@
+{
+  "ready": ["Ana"],
+  "needsReview": ["Rae"],
+  "optedOut": ["Omar"],
+  "reviewReasons": {
+    "Rae": ["Subscription status \"pending\" is unclear. Confirm permission before texting."]
+  }
+}

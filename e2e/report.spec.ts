@@ -167,15 +167,41 @@ test('opts out everyone who shares a phone with someone who says STOP', async ({
 });
 
 test('Check another file returns focus to Step 1', async ({ page }) => {
+  const uploadHeightBefore = (await page.locator('#upload-zone').boundingBox())!.height;
   await page.getByRole('button', { name: 'No file handy? Try a sample list' }).click();
   await page.getByRole('link', { name: 'Check another file' }).click();
 
   await expect(page.locator('#results-card')).toBeHidden();
   await expect(page.locator('#hero-title')).toBeFocused();
+  await expect(page.locator('#step-announcement')).toHaveText(
+    'Started over. Choose a file to check.',
+  );
+  await expect(page.locator('#file-status')).toBeHidden();
+  expect(await page.locator('#hero-title').evaluate((heading) => getComputedStyle(heading).outlineStyle))
+    .toBe('none');
+  const uploadHeightAfter = (await page.locator('#upload-zone').boundingBox())!.height;
+  expect(uploadHeightAfter).toBe(uploadHeightBefore);
   const uploadBox = await page.locator('#upload-zone').boundingBox();
   expect(uploadBox).not.toBeNull();
   expect(uploadBox!.y).toBeGreaterThanOrEqual(0);
   expect(uploadBox!.y).toBeLessThan(await page.evaluate(() => innerHeight));
+});
+
+test('focuses and scrolls the results heading into view on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'No file handy? Try a sample list' }).click();
+
+  const heading = page.locator('#results-title');
+  await expect(heading).toBeFocused();
+  expect(await heading.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe('none');
+  await page.waitForFunction(() => {
+    const box = document.querySelector('#results-title')?.getBoundingClientRect();
+    return box !== undefined && box.top >= 0 && box.bottom <= innerHeight;
+  });
+  const box = await heading.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y).toBeGreaterThanOrEqual(0);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(await page.evaluate(() => innerHeight));
 });
 
 test('logo returns to Step 1 without reloading and does not reset there', async ({ page }) => {
@@ -192,15 +218,16 @@ test('logo returns to Step 1 without reloading and does not reset there', async 
 
   await expect(page.locator('#results-card')).toBeHidden();
   await expect(page.locator('#hero-title')).toBeFocused();
-  await expect(page.locator('#file-status')).toHaveText(
+  await expect(page.locator('#step-announcement')).toHaveText(
     'Started over. Choose a file to check.',
   );
+  await expect(page.locator('#file-status')).toBeHidden();
   await expect(page.locator('#file-input')).toHaveValue('');
 
   await page.locator('#wordmark').click();
 
   await expect(page.locator('#results-card')).toBeHidden();
-  await expect(page.locator('#file-status')).toHaveText(
+  await expect(page.locator('#step-announcement')).toHaveText(
     'Started over. Choose a file to check.',
   );
   expect(page.url()).toBe(startingUrl);
@@ -351,6 +378,69 @@ test('preserves accented names and the UTF-8 BOM through download and re-upload'
   });
   await expect(page.locator('#ready-count')).toHaveText('1');
   await expect(page.locator('#checked-file-name')).toHaveText(download.suggestedFilename());
+});
+
+test('normalizes mixed line endings before checking a list', async ({ page }) => {
+  const encoded = await readFile(
+    new URL('../tests/fixtures/mixed-line-endings.csv.base64', import.meta.url),
+    'utf8',
+  );
+  await page.locator('#file-input').setInputFiles({
+    name: 'mixed-lines.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(encoded, 'base64'),
+  });
+
+  await expect(page.locator('#summary')).toHaveText('2 ready, 0 to review, 0 opted out.');
+  await expect(page.locator('#opt-out-note')).toContainText(
+    'No phone column, so we checked emails only.',
+  );
+});
+
+test('reads Windows-1252 names in the browser and in the download', async ({ page }) => {
+  const encoded = await readFile(
+    new URL('../tests/fixtures/windows-1252.csv.base64', import.meta.url),
+    'utf8',
+  );
+  await page.locator('#file-input').setInputFiles({
+    name: 'windows-1252.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(encoded, 'base64'),
+  });
+
+  await expect(page.locator('#ready-count')).toHaveText('1');
+  await expect(page.locator('#opt-out-note')).toContainText(
+    'This file was read as Windows-1252 to preserve names.',
+  );
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download ready list (1)' }).click();
+  const download = await downloadPromise;
+  const path = await download.path();
+  if (!path) {
+    throw new Error('The Windows-1252 download did not produce a file');
+  }
+  const parsed = Papa.parse<Record<string, string>>(await readFile(path, 'utf8'), {
+    header: true,
+  });
+  expect(parsed.data[0]).toMatchObject({ first_name: 'José', last_name: 'Peña' });
+});
+
+test('does not mark email-only people as missing a phone number', async ({ page }) => {
+  const fixture = await readFile(
+    new URL('../tests/fixtures/email-only.csv', import.meta.url),
+  );
+  await page.locator('#file-input').setInputFiles({
+    name: 'email-only.csv',
+    mimeType: 'text/csv',
+    buffer: fixture,
+  });
+
+  await expect(page.locator('#ready-count')).toHaveText('1');
+  await expect(page.locator('#review-count')).toHaveText('0');
+  await expect(page.locator('#opt-out-note')).toContainText(
+    'No phone column, so we checked emails only.',
+  );
+  await expect(page.locator('#review-table-body tr')).toHaveCount(0);
 });
 
 test('renders names as text and escapes spreadsheet formulas in downloaded cells', async ({ page }) => {
@@ -600,9 +690,9 @@ test('checks 10,000 rows quickly and keeps the review table bounded', async ({
 
   const rows = Array.from(
     { length: 10_000 },
-    (_, index) => `Member ${index},member${index}@example.com,No`,
+    (_, index) => `Member ${index},member${index}@example.com,,No`,
   );
-  const csv = `first_name,email,opt_out\n${rows.join('\n')}`;
+  const csv = `first_name,email,phone,opt_out\n${rows.join('\n')}`;
   const startedAt = Date.now();
   await page.locator('#file-input').setInputFiles({
     name: 'large.csv',
@@ -621,6 +711,27 @@ test('checks 10,000 rows quickly and keeps the review table bounded', async ({
   await page.locator('#wordmark').click();
   await expect(page.locator('#results-card')).toBeHidden();
   await expect(page.locator('#hero-title')).toBeFocused();
+});
+
+test('processes a 100,000-person list', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'The large-list limit is measured in Chromium only.');
+
+  const rows = Array.from(
+    { length: 100_000 },
+    (_, index) => `Member ${index},member${index}@example.com,No`,
+  );
+  const csv = `first_name,email,opt_out\n${rows.join('\n')}`;
+  const startedAt = Date.now();
+  await page.locator('#file-input').setInputFiles({
+    name: '100000-people.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csv),
+  });
+  await expect(page.locator('#summary')).toHaveText(
+    '100000 ready, 0 to review, 0 opted out.',
+    { timeout: 20_000 },
+  );
+  expect(Date.now() - startedAt).toBeLessThan(20_000);
 });
 
 test('does not prevent modified clicks on the logo', async ({ page }) => {
@@ -698,6 +809,7 @@ test('supports keyboard navigation with a visible focus outline', async ({ page 
 
 test('fits a phone-width screen at 200% zoom and supports dark mode', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const footerLinkPositions = await page.locator('.footer-links a').evaluateAll((links) =>
     links.map((link) => link.getBoundingClientRect().y),
   );

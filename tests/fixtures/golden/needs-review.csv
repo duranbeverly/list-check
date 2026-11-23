@@ -1,0 +1,9 @@
+﻿first_name,last_name,email,phone,opt_out,phone_clean,why
+Maria,Lopez,Maria.Lopez@example.com,571-555-0101,No,+15715550101,Same email as row 9. Keep one.
+Kevin,Brooks,kevin.brooks@example.com,555-01,,,Phone too short. Check the number.
+Linda,Park,linda.park@example.com,,No,,Phone missing. Add the number if available.
+Maria,Lopez,maria.lopez@example.com,571-555-0108,,+15715550108,Same email as row 2. Keep one.
+Derek,Miles,derek.miles@example.com,571-555-0110,No,+15715550110,Same phone as row 11. Confirm who uses it.
+Derek,Miles,dmiles@example.com,(571) 555-0110,,+15715550110,Same phone as row 10. Confirm who uses it.
+Ana,Reyes,ana.reyes@example.com,571-555-0111,,+15715550111,Phone shared with row 13. Confirm who uses it.
+Luis,Reyes,luis.reyes@example.com,571-555-0111,No,+15715550111,Phone shared with row 12. Confirm who uses it.

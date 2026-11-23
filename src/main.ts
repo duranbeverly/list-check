@@ -2,6 +2,7 @@ import '@fontsource/atkinson-hyperlegible/400.css';
 import '@fontsource/atkinson-hyperlegible/700.css';
 import Papa from 'papaparse';
 import { guessColumns, inferOptOutMode } from './columns';
+import { decodeCsvBytes } from './csv';
 import {
   checkList,
   findDuplicates,
@@ -27,6 +28,8 @@ function getRequiredElement<T extends Element>(
 const fileInput = getRequiredElement('file-input', HTMLInputElement);
 const wordmark = getRequiredElement('wordmark', HTMLAnchorElement);
 const stepOneHeading = getRequiredElement('hero-title', HTMLHeadingElement);
+const resultsHeading = getRequiredElement('results-title', HTMLHeadingElement);
+const stepAnnouncement = getRequiredElement('step-announcement', HTMLParagraphElement);
 const uploadZone = getRequiredElement('upload-zone', HTMLDivElement);
 const uploadPrompt = getRequiredElement('upload-prompt', HTMLElement);
 const dropInstruction = getRequiredElement('drop-instruction', HTMLElement);
@@ -70,6 +73,7 @@ let pendingOptOutResolution: {
   fileName: string;
   rows: RawRow[];
   headers: string[];
+  encodingNote: string;
 } | null = null;
 
 function setFileStatus(message: string, state?: 'error' | 'loading') {
@@ -119,7 +123,8 @@ function showStepOne() {
   ++runCounter;
   clearResults();
   chooseCard.hidden = false;
-  setFileStatus('Started over. Choose a file to check.');
+  setFileStatus('');
+  stepAnnouncement.textContent = 'Started over. Choose a file to check.';
   selectedFile.textContent = '';
   selectedFile.hidden = true;
   chooseDifferentFile.hidden = true;
@@ -289,6 +294,11 @@ function renderReport(
 
   chooseCard.hidden = true;
   resultsCard.hidden = false;
+  resultsHeading.focus({ preventScroll: true });
+  resultsHeading.scrollIntoView({
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    block: 'start',
+  });
 }
 
 function renderParsedList(
@@ -297,12 +307,18 @@ function renderParsedList(
   headers: string[],
   columns: ColumnMapping,
   mappingMessage: string,
+  encodingNote: string,
 ) {
   const members = toMembers(rows, columns);
   const duplicateGroups = findDuplicates(members);
   const buckets = checkList(members, duplicateGroups);
   setFileStatus('');
-  renderReport(fileName, buckets, headers, mappingMessage);
+  const notes = [
+    mappingMessage,
+    columns.phone ? '' : 'No phone column, so we checked emails only.',
+    encodingNote,
+  ].filter(Boolean);
+  renderReport(fileName, buckets, headers, notes.join(' '));
 }
 
 function requestOptOutResolution(
@@ -310,8 +326,9 @@ function requestOptOutResolution(
   rows: RawRow[],
   headers: string[],
   columns: ColumnMapping,
+  encodingNote: string,
 ) {
-  pendingOptOutResolution = { fileName, rows, headers };
+  pendingOptOutResolution = { fileName, rows, headers, encodingNote };
   optOutColumnSelect.replaceChildren(new Option('Choose a column', ''));
   for (const header of headers) {
     const option = document.createElement('option');
@@ -349,7 +366,14 @@ function useSelectedOptOutColumn() {
   const mappingMessage = `Opt-out column selected: ${selectedColumn} (confirmed).`;
   pendingOptOutResolution = null;
   optOutSetup.hidden = true;
-  renderParsedList(pending.fileName, pending.rows, pending.headers, columns, mappingMessage);
+  renderParsedList(
+    pending.fileName,
+    pending.rows,
+    pending.headers,
+    columns,
+    mappingMessage,
+    pending.encodingNote,
+  );
 }
 
 function confirmNoOptOutColumn() {
@@ -370,6 +394,7 @@ function confirmNoOptOutColumn() {
     pending.headers,
     columns,
     'You confirmed this list has no opt-out column.',
+    pending.encodingNote,
   );
 }
 
@@ -380,19 +405,33 @@ function showFileError(message: string) {
   fileStatus.focus();
 }
 
-function handleFile(file: File, existingRun?: number) {
+async function handleFile(file: File, existingRun?: number) {
   const runId = existingRun ?? ++runCounter;
   clearResults();
+  stepAnnouncement.textContent = '';
   chooseCard.hidden = false;
   selectedFile.textContent = `Selected file: ${file.name}`;
   selectedFile.hidden = false;
   chooseDifferentFile.hidden = false;
   setFileStatus('Checking your list…', 'loading');
 
-  Papa.parse<Record<string, string>>(file, {
+  let decodedCsv: ReturnType<typeof decodeCsvBytes>;
+  try {
+    decodedCsv = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
+  } catch {
+    if (runId === runCounter) {
+      showFileError('Could not read this file. Check that it is a CSV file, then try again.');
+    }
+    return;
+  }
+  if (runId !== runCounter) return;
+
+  const encodingNote = decodedCsv.encoding === 'Windows-1252'
+    ? 'This file was read as Windows-1252 to preserve names.'
+    : '';
+  Papa.parse<Record<string, string>>(decodedCsv.text, {
     header: true,
     skipEmptyLines: false,
-    encoding: 'UTF-8',
     delimiter: ',',
     complete: (results) => {
       if (runId !== runCounter) return;
@@ -431,7 +470,7 @@ function handleFile(file: File, existingRun?: number) {
       }
 
       if (columns.optOutConfidence !== 'high') {
-        requestOptOutResolution(file.name, results.data, headers, columns);
+        requestOptOutResolution(file.name, results.data, headers, columns, encodingNote);
         return;
       }
 
@@ -441,6 +480,7 @@ function handleFile(file: File, existingRun?: number) {
         headers,
         columns,
         `Opt-out column recognized with high confidence: ${columns.optOut}.`,
+        encodingNote,
       );
     },
     error: () => {
@@ -501,6 +541,7 @@ chooseDifferentFile.addEventListener('click', () => fileInput.click());
 
 sampleButton.addEventListener('click', async () => {
   const runId = ++runCounter;
+  stepAnnouncement.textContent = '';
   clearResults();
   chooseCard.hidden = false;
   setFileStatus('Loading the sample list…', 'loading');

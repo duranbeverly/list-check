@@ -1,7 +1,16 @@
 // Describe the phone-cleaning result without losing failure details.
 export type PhoneResult =
   | { ok: true; phone: string }
-  | { ok: false; why: 'missing' | 'too short' | 'not a valid number' };
+  | {
+    ok: false;
+    why:
+      | 'missing'
+      | 'too short'
+      | 'not a valid number'
+      | 'has extension'
+      | 'Excel shortened this number'
+      | 'international number';
+  };
 
 export type OptOutDecision = boolean | { needsReview: true; why: string };
 export type OptOutMode = 'flag' | 'status' | 'none' | null;
@@ -28,7 +37,7 @@ export interface Member {
   email: string;
   optOut: string;
   optOutMode: OptOutMode;
-  phone: PhoneResult;
+  phone: PhoneResult | null;
   original: RawRow;
 }
 

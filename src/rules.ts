@@ -20,6 +20,9 @@ export function cleanPhone(value: string, country: CountryCode = 'US'): PhoneRes
   if (!trimmedValue) {
     return { ok: false, why: 'missing' };
   }
+  if (/^\d(?:\.\d+)?e\+\d+$/i.test(trimmedValue)) {
+    return { ok: false, why: 'Excel shortened this number' };
+  }
 
   const parsedPhone = parsePhoneNumberFromString(trimmedValue, country);
   const lengthIssue = validatePhoneNumberLength(trimmedValue, country);
@@ -34,6 +37,13 @@ export function cleanPhone(value: string, country: CountryCode = 'US'): PhoneRes
     }
 
     return { ok: false, why: 'not a valid number' };
+  }
+
+  if (parsedPhone.ext) {
+    return { ok: false, why: 'has extension' };
+  }
+  if (parsedPhone.country !== country) {
+    return { ok: false, why: 'international number' };
   }
 
   return { ok: true, phone: parsedPhone.number };
@@ -94,7 +104,7 @@ export function toMembers(rows: RawRow[], columns: ColumnMapping): Member[] {
       email: readValue(columns.email),
       optOut: readValue(columns.optOut),
       optOutMode: columns.optOutMode,
-      phone: cleanPhone(readValue(columns.phone)),
+      phone: columns.phone ? cleanPhone(readValue(columns.phone)) : null,
       original,
     }];
   });
@@ -169,7 +179,7 @@ export function findDuplicates(members: Member[]): DuplicateGroup[] {
       addToGroup(emailGroups, emailKey, member);
     }
 
-    if (member.phone.ok) {
+    if (member.phone?.ok) {
       addToGroup(phoneGroups, member.phone.phone, member);
     }
   }
@@ -218,7 +228,7 @@ export function checkList(members: Member[], duplicateGroups: DuplicateGroup[]):
     const decision = isOptOut(member.optOut, member.optOutMode);
     optOutByRow.set(member.row, decision);
 
-    if (member.phone.ok && decision === true) {
+    if (member.phone?.ok && decision === true) {
       addToGroup(optedOutRowsByPhone, member.phone.phone, member.row);
     }
   }
@@ -230,14 +240,14 @@ export function checkList(members: Member[], duplicateGroups: DuplicateGroup[]):
       needsReview: true,
       why: 'Opt-out status could not be determined.',
     };
-    const sharedOptOutRows = member.phone.ok
+    const sharedOptOutRows = member.phone?.ok
       ? (optedOutRowsByPhone.get(member.phone.phone) ?? [])
         .filter((row) => row !== member.row)
         .sort((first, second) => first - second)
       : [];
     const reasons: string[] = [];
 
-    if (!member.phone.ok) {
+    if (member.phone && !member.phone.ok) {
       reasons.push(`phone ${member.phone.why}`);
     }
     if (decision !== true && typeof decision === 'object') {
@@ -275,7 +285,7 @@ export function checkList(members: Member[], duplicateGroups: DuplicateGroup[]):
     const checkedMember = { ...member, reasons };
     if (decision === true || sharedOptOutRows.length > 0) {
       buckets.optedOut.push(checkedMember);
-    } else if (!member.phone.ok || typeof decision === 'object' || reasons.length > 0) {
+    } else if ((member.phone !== null && !member.phone.ok) || typeof decision === 'object' || reasons.length > 0) {
       buckets.needsReview.push(checkedMember);
     } else {
       buckets.ready.push(checkedMember);
@@ -294,6 +304,13 @@ export function formatReviewReason(reason: string): string {
   if (reason === 'phone too short') return 'Phone too short. Check the number.';
   if (reason === 'phone missing') return 'Phone missing. Add the number if available.';
   if (reason === 'phone not a valid number') return 'Phone is not valid. Check the number.';
+  if (reason === 'phone has extension') return 'Likely a desk phone.';
+  if (reason === 'phone Excel shortened this number') {
+    return 'Excel shortened this number. Re-export the phone column as text.';
+  }
+  if (reason === 'phone international number') {
+    return 'International number. Check your texting tool supports it.';
+  }
 
   const duplicateEmail = reason.match(/^same email as row (\d+)$/);
   if (duplicateEmail) return `Same email as row ${duplicateEmail[1]}. Keep one.`;
@@ -353,7 +370,7 @@ export function toCsv(bucket: CheckedMember[], headers: string[]): string {
   };
   const phoneCleanIndex = findReusableColumn(
     'phone_clean',
-    (member) => member.phone.ok ? member.phone.phone : '',
+    (member) => member.phone?.ok ? member.phone.phone : '',
   );
   const whyIndex = findReusableColumn(
     'why',
@@ -367,7 +384,7 @@ export function toCsv(bucket: CheckedMember[], headers: string[]): string {
     ...(whyHeader ? [whyHeader] : []),
   ];
   const data = bucket.map((member) => {
-    const phoneClean = member.phone.ok ? member.phone.phone : '';
+    const phoneClean = member.phone?.ok ? member.phone.phone : '';
     const why = escapeSpreadsheetFormula(member.reasons.map(formatReviewReason).join(' '));
     const originalColumns = headers.map((header, index) => {
       if (index === phoneCleanIndex) return phoneClean;

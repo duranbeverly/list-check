@@ -1,27 +1,65 @@
 # list-check
 
-![list-check checkmark mark](./public/favicon.svg)
+[Try list-check](https://duranbeverly.github.io/list-check/)
 
 A small tool for checking contact lists before texting.
 
-## Voice and brand
+| Light mode | Dark mode |
+|---|---|
+| ![list-check in light mode](./e2e/visual.spec.ts-snapshots/step-one-light.png) | ![list-check in dark mode](./e2e/visual.spec.ts-snapshots/step-one-dark.png) |
 
-Use plain, calm, reassuring language. Say “people,” not “records,” and always tell organizers what to do next. The checkmark in a rounded square is the app mark; keep it consistent across the header and favicon.
+## What it does
 
-See [BRAND.md](./BRAND.md) for the shared palette, type, icon, spacing, shape, and motion rules.
+Choose a CSV or try the sample list. list-check checks phone numbers, duplicate contacts, and opt-outs in your browser, then lets you download separate CSVs for people who are ready, people to review, and people who opted out.
 
-## How it works
+If an opt-out column isn't recognized, list-check pauses before showing results. Choose the right column or confirm that the list has no opt-outs. Unfamiliar opt-out values stay in the review list.
 
-Choose a CSV or try the sample list. list-check checks phone numbers, duplicate contacts, and opt-outs in your browser, then lets you download separate CSVs for the ready people, people to review, and opt-outs.
+## What it doesn't do
 
-## Privacy
+- It doesn't merge or remove people from your list.
+- It doesn't upload your CSV or send it to a server.
+- It doesn't connect to your texting platform or any account.
 
-Your selected CSV is read in your browser and is not uploaded. Downloads are created on your device. The sample list is a static file served by this site; the app does not send your contact list to a server.
+Your selected CSV is read in your browser. Downloads are created on your device. The sample list is a static file served by this site.
+
+## Design and voice
+
+list-check is meant to feel calm, clear, and helpful. It talks about people, not records, and explains what to do next without blaming anyone.
+
+The interface uses a contrast-checked palette, Atkinson Hyperlegible type, and accessibility patterns inspired by GOV.UK—including clear focus handling when a new step appears. See [BRAND.md](./BRAND.md) for the full palette, type, icons, spacing, shape, and motion rules.
 
 ## Decisions
 
-- Shared phone groups need human review rather than being marked ready. A text to a shared number can reach multiple people, so someone should confirm who will receive it before sending.
+- Shared phone groups need human review. A text to a shared number can reach multiple people, so someone should confirm who will receive it.
 - If anyone sharing a phone number opts out, treat the whole number as opted out. A STOP applies to the destination number, so no one sharing it should be messaged.
+- Subscription-status columns treat values such as `unsubscribed` and `stopped` as opted out, and `subscribed` and `active` as not opted out. Unfamiliar values need review.
 - Duplicate groups are flags only. The tool never merges member records.
 - Downloaded CSVs add apostrophes to formula-like values in original columns and reasons, but not `phone_clean`, so spreadsheets are safer while clean numbers remain importable.
 - Downloads include a UTF-8 byte order mark so Excel displays accented names correctly; Papa Parse removes it when reading the CSV again.
+
+## Limits
+
+The app is tested with lists of up to 100,000 people. Larger files may take longer to check.
+
+## Testing
+
+- `npm test` runs the unit, property-based, CSV fixture, and golden-file tests.
+- `npm run test:e2e` builds the production site and runs Playwright in Chromium, Firefox, and WebKit. The browser tests cover privacy, downloads, keyboard use, axe accessibility checks, and visual snapshots.
+- GitHub Actions runs the unit and browser tests for changes to `main` and pull requests.
+
+## Run locally
+
+```sh
+npm ci
+npm run dev
+npm test
+npm run test:e2e
+```
+
+Install the Playwright browsers if needed:
+
+```sh
+npx playwright install chromium firefox webkit
+```
+
+Scaffolded with [Vite](https://vite.dev/).

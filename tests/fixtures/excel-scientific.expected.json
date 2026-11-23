@@ -1,0 +1,8 @@
+{
+  "ready": [],
+  "needsReview": ["Sam"],
+  "optedOut": [],
+  "reviewReasons": {
+    "Sam": ["Excel shortened this number. Re-export the phone column as text."]
+  }
+}

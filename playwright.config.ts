@@ -4,7 +4,8 @@ import { defineConfig } from '@playwright/test';
 // Run browser tests against the production build at the GitHub Pages base path.
 export default defineConfig({
   testDir: './e2e',
-  workers: 2,
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
+  workers: 1,
   retries: env.CI ? 1 : 0,
   use: {
     baseURL: 'http://127.0.0.1:4173/list-check/',

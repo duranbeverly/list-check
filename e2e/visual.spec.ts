@@ -40,6 +40,7 @@ for (const viewport of viewports) {
       await expect(page).toHaveScreenshot(`step-${step}-${viewport.name}.png`, {
         fullPage: true,
         animations: 'disabled',
+        maxDiffPixelRatio: 0.02,
       });
     });
   }

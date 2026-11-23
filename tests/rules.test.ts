@@ -43,6 +43,21 @@ describe('cleanPhone', () => {
     expect(cleanPhone('555-01')).toEqual({ ok: false, why: 'too short' });
   });
 
+  it('recognizes extensions, Excel notation, and international numbers', () => {
+    expect(cleanPhone('571-555-0107 ext 23')).toEqual({
+      ok: false,
+      why: 'has extension',
+    });
+    expect(cleanPhone('5.71555E+09')).toEqual({
+      ok: false,
+      why: 'Excel shortened this number',
+    });
+    expect(cleanPhone('+442071838750')).toEqual({
+      ok: false,
+      why: 'international number',
+    });
+  });
+
   // Treat empty and whitespace-only values as missing.
   it.each(['', '   '])('reports %j as missing', (input) => {
     expect(cleanPhone(input)).toEqual({ ok: false, why: 'missing' });

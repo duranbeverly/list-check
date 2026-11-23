@@ -1,0 +1,8 @@
+{
+  "ready": [],
+  "needsReview": ["Alex"],
+  "optedOut": [],
+  "reviewReasons": {
+    "Alex": ["International number. Check your texting tool supports it."]
+  }
+}

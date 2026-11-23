@@ -1,0 +1,6 @@
+﻿first_name,last_name,email,phone,opt_out,phone_clean,why
+James,Carter,james.carter@example.com,(571) 555-0102,,+15715550102,
+Aisha,Khan,aisha.khan@example.com,5715550103,No,+15715550103,
+Tom,Nguyen,tom.nguyen@example.com,15715550104,,+15715550104,
+Rosa,Diaz,rosa.diaz@example.com,'+15715550105,No,+15715550105,
+Sam,Lee,sam.lee@example.com,571-555-0116,No,+15715550116,

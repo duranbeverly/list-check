@@ -1,0 +1,8 @@
+{
+  "ready": [],
+  "needsReview": ["Jo"],
+  "optedOut": [],
+  "reviewReasons": {
+    "Jo": ["Likely a desk phone."]
+  }
+}
