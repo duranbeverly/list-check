@@ -12,10 +12,13 @@
   --color-ready-tint: #e8f0e9;
   --color-review: #71520b;
   --color-review-tint: #f5efd9;
-  --color-opted-out: #8c3b32;
-  --color-opted-out-tint: #f5e7e4;
+  --color-error: #8c3b32;
+  --color-error-tint: #f5e7e4;
   --color-badge-background: #e8ebea;
   --color-badge-text: #55636a;
+  --color-opted-out: var(--color-muted);
+  --color-opted-out-tint: var(--color-badge-background);
+  --color-zero-tint: var(--color-badge-background);
   --color-primary-contrast: #ffffff;
   --color-upload-background: var(--color-brand-tint);
   --color-upload-hover: #d3e8e9;
@@ -385,15 +388,15 @@ h3 {
 }
 
 .file-status--error {
-  background: var(--color-opted-out-tint);
-  border-left: 4px solid var(--color-opted-out);
+  background: var(--color-error-tint);
+  border-left: 4px solid var(--color-error);
   color: var(--color-text);
   padding: var(--space-2);
 }
 
 .file-status-icon,
 .loading-spinner {
-  color: var(--color-opted-out);
+  color: var(--color-error);
   flex: 0 0 24px;
   height: 24px;
   width: 24px;
@@ -592,7 +595,7 @@ a:focus-visible {
 }
 
 .stat-tile--empty {
-  background: var(--color-badge-background);
+  background: var(--color-zero-tint);
   border-color: var(--color-border-decorative);
   color: var(--color-muted);
 }
@@ -980,8 +983,8 @@ a:focus-visible {
     --color-ready-tint: #213a2d;
     --color-review: #f0d483;
     --color-review-tint: #30302a;
-    --color-opted-out: #edaaa1;
-    --color-opted-out-tint: #332b2b;
+    --color-error: #edaaa1;
+    --color-error-tint: #332b2b;
     --color-badge-background: #2b393c;
     --color-badge-text: #a9b8ba;
     --color-primary-contrast: #142022;

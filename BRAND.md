@@ -17,9 +17,11 @@ Help organizers text only the members who should get texts. The personality is c
 | Decorative border | `#d8dedf` | Dividers only; never conveys state |
 | Ready / tint | `#315a46` / `#e8f0e9` | 6.74:1 |
 | Review / tint | `#71520b` / `#f5efd9` | 6.26:1 |
-| Opted out / tint | `#8c3b32` / `#f5e7e4` | 6.26:1 |
+| Opted out / tint | `#55636a` / `#e8ebea` | 5.18:1 |
+| Error / tint | `#8c3b32` / `#f5e7e4` | 6.26:1 |
+| Zero-count / tint | `#55636a` / `#e8ebea` | 5.18:1 |
 
-Dark mode uses page `#142022`, surface `#1d2b2e`, text `#e7eeee`, muted `#a9b8ba`, and brand teal `#7cc4c9`. Ready `#a7d6b7` on `#213a2d` is 7.58:1; review `#f0d483` on `#403717` is 8.13:1; opted out `#edaaa1` on `#452a29` is 6.72:1. State meaning always includes an icon and words, not color alone.
+Dark mode uses page `#142022`, surface `#1d2b2e`, text `#e7eeee`, muted `#a9b8ba`, and brand teal `#7cc4c9`. Ready `#a7d6b7` on `#213a2d` is 7.58:1; review `#f0d483` on `#30302a` is 9.13:1; opted out and zero-count `#a9b8ba` on `#2b393c` is 5.85:1; error `#edaaa1` on `#332b2b` is 7.14:1. State meaning always includes an icon and words, not color alone.
 
 Color values belong in CSS `:root` tokens. The browser’s theme-color metadata and standalone SVG/PNG assets repeat the relevant token values because they cannot read the page stylesheet.
 

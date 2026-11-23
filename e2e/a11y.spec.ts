@@ -6,12 +6,86 @@ test.beforeEach(async ({ page }) => {
   await page.goto('./');
 });
 
+function contrastRatio(foreground: string, background: string): number {
+  function luminance(color: string): number {
+    const channels = color.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+    if (!channels || channels.length !== 3) {
+      throw new Error(`Unexpected computed color: ${color}`);
+    }
+
+    const linearChannel = (index: number) => {
+      const value = Number(channels[index]) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * linearChannel(0) + 0.7152 * linearChannel(1) + 0.0722 * linearChannel(2);
+  }
+
+  const luminances = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (luminances[0] + 0.05) / (luminances[1] + 0.05);
+}
+
 test('the published page has a strict Content Security Policy', async ({ page }) => {
   const csp = await page
     .locator('meta[http-equiv="Content-Security-Policy"]')
     .getAttribute('content');
   expect(csp).toContain("default-src 'self'");
   expect(csp).toContain("form-action 'none'");
+});
+
+test('keeps error, opted-out, and zero-count colors distinct and readable', async ({ page }) => {
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await page.locator('#file-input').setInputFiles({
+      name: 'missing-contact.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('first_name,last_name\nAna,Reyes'),
+    });
+    await expect(page.locator('#file-status')).toHaveClass(/file-status--error/);
+    const errorColors = await page.evaluate(() => {
+      const status = document.querySelector<HTMLElement>('#file-status')!;
+      const icon = document.querySelector<SVGElement>('#file-status-icon')!;
+      const tile = document.querySelector<HTMLElement>('#opted-out-tile')!;
+      return {
+        text: getComputedStyle(status).color,
+        background: getComputedStyle(status).backgroundColor,
+        border: getComputedStyle(status).borderLeftColor,
+        icon: getComputedStyle(icon).color,
+        optedOut: getComputedStyle(tile).color,
+      };
+    });
+    expect(contrastRatio(errorColors.text, errorColors.background)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(errorColors.icon, errorColors.background)).toBeGreaterThanOrEqual(3);
+    expect(errorColors.icon).not.toBe(errorColors.optedOut);
+    expect(errorColors.border).toBe(errorColors.icon);
+
+    await page.goto('./');
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await page.locator('#file-input').setInputFiles({
+      name: 'opted-out.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('email,opt_out\nana@example.com,Yes'),
+    });
+    await expect(page.locator('#opted-out-tile')).not.toHaveClass(/stat-tile--empty/);
+    let tileColors = await page.locator('#opted-out-tile').evaluate((tile) => ({
+      text: getComputedStyle(tile).color,
+      background: getComputedStyle(tile).backgroundColor,
+    }));
+    expect(contrastRatio(tileColors.text, tileColors.background)).toBeGreaterThanOrEqual(4.5);
+
+    await page.goto('./');
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await page.locator('#file-input').setInputFiles({
+      name: 'ready.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('email,opt_out\nana@example.com,No'),
+    });
+    await expect(page.locator('#opted-out-tile')).toHaveClass(/stat-tile--empty/);
+    tileColors = await page.locator('#opted-out-tile').evaluate((tile) => ({
+      text: getComputedStyle(tile).color,
+      background: getComputedStyle(tile).backgroundColor,
+    }));
+    expect(contrastRatio(tileColors.text, tileColors.background)).toBeGreaterThanOrEqual(4.5);
+  }
 });
 
 test('aligns the header, hero, trust line, and example result', async ({ page }) => {
