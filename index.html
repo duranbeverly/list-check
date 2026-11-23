@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+  <!-- Set the page name and mobile layout. -->
   <head>
     <meta charset="UTF-8" />
     
@@ -7,14 +8,14 @@
     <title>list-check</title>
   </head>
   <body>
+    <!-- Let visitors upload a CSV or try the sample list. -->
     <div id="app">
-      <!-- Create a label for the file input -->
       <label for="file-input">Select a CSV file</label>
-      <!-- Add result paragraph -->
-      <p id="summary" aria-live="polite"></p>
       <input type="file" id="file-input" accept=".csv">
       <button type="button" id="sample-button">Try it with a sample list</button>
+      <p id="summary" aria-live="polite"></p>
     </div>
+    <!-- Start the app. -->
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

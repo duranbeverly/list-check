@@ -1,8 +1,11 @@
+// Load the CSV reader and page styles.
 import Papa from 'papaparse';
 import './style.css';
 
+// Find the controls and result area.
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
 const sampleButton = document.getElementById('sample-button') as HTMLButtonElement;
+const summaryParagraph = document.getElementById('summary') as HTMLParagraphElement;
 
 // Make sure the upload control is on the page.
 if (!fileInput) {
@@ -14,13 +17,13 @@ if (!sampleButton) {
   throw new Error('Sample button element not found');
 }
 
+// Make sure the result area is on the page.
+if (!summaryParagraph) {
+  throw new Error('Summary paragraph element not found');
+}
+
 // Read the selected file and share a clear result.
 function handleFile(file: File) {
-  const summaryParagraph = document.getElementById('summary') as HTMLParagraphElement;
-  if (!summaryParagraph) {
-    throw new Error('Summary paragraph element not found');
-  }
-
   // Let people know the file is being read.
   summaryParagraph.textContent = `Reading ${file.name}…`;
 
@@ -51,7 +54,7 @@ function handleFile(file: File) {
       );
     },
 
-    // Help people recover if the file cannot be opened.
+    // Show a helpful message if the file cannot be read.
     error: () => {
       summaryParagraph.textContent = `We couldn't read ${file.name}. Please try another CSV file.`;
     },
@@ -66,15 +69,11 @@ fileInput.addEventListener('change', () => {
   }
 });
 
-// Load the sample list and send it through the same file-reading flow.
+// Load the sample list and use the same file reader.
 sampleButton.addEventListener('click', async () => {
-  const summaryParagraph = document.getElementById('summary') as HTMLParagraphElement;
-  if (!summaryParagraph) {
-    throw new Error('Summary paragraph element not found');
-  }
-
   summaryParagraph.textContent = 'Loading the sample list…';
 
+  // Download the sample list and pass it to the file reader.
   try {
     const response = await fetch(import.meta.env.BASE_URL + 'sample-members.csv');
     if (!response.ok) {
