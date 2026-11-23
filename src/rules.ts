@@ -9,6 +9,7 @@ import type {
   Member,
   MemberBuckets,
   OptOutDecision,
+  OptOutMode,
   PhoneResult,
   RawRow,
 } from './types';
@@ -39,9 +40,31 @@ export function cleanPhone(value: string, country: CountryCode = 'US'): PhoneRes
 }
 
 // Never infer consent from an unfamiliar opt-out value.
-export function isOptOut(value: string): OptOutDecision {
+export function isOptOut(value: string, mode: OptOutMode = 'flag'): OptOutDecision {
   const trimmedValue = value.trim();
-  const normalizedValue = trimmedValue.toLowerCase();
+  const normalizedValue = trimmedValue
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  if (mode === null) {
+    return { needsReview: true, why: 'Opt-out column not confirmed.' };
+  }
+  if (mode === 'none') {
+    return false;
+  }
+
+  if (mode === 'status') {
+    if (['unsubscribed', 'unsubscribe', 'stopped', 'stop', 'opted out', 'opt out', 'do not text', 'do not contact', 'inactive'].includes(normalizedValue)) {
+      return true;
+    }
+    if (['subscribed', 'active', 'opted in', 'subscribed to sms', 'opted in to sms'].includes(normalizedValue)) {
+      return false;
+    }
+
+    return { needsReview: true, why: `Subscription status "${trimmedValue}" is unclear.` };
+  }
 
   if (['yes', 'y', 'true', '1', 'stop', 'do not text', 'unsubscribe', 'unsubscribed', 'opted out', 'opt out'].includes(normalizedValue)) {
     return true;
@@ -70,6 +93,7 @@ export function toMembers(rows: RawRow[], columns: ColumnMapping): Member[] {
       lastName: readValue(columns.lastName),
       email: readValue(columns.email),
       optOut: readValue(columns.optOut),
+      optOutMode: columns.optOutMode,
       phone: cleanPhone(readValue(columns.phone)),
       original,
     }];
@@ -191,7 +215,7 @@ export function checkList(members: Member[], duplicateGroups: DuplicateGroup[]):
   const optedOutRowsByPhone = new Map<string, number[]>();
 
   for (const member of members) {
-    const decision = isOptOut(member.optOut);
+    const decision = isOptOut(member.optOut, member.optOutMode);
     optOutByRow.set(member.row, decision);
 
     if (member.phone.ok && decision === true) {
@@ -202,7 +226,10 @@ export function checkList(members: Member[], duplicateGroups: DuplicateGroup[]):
   const buckets: MemberBuckets = { ready: [], needsReview: [], optedOut: [] };
 
   for (const member of members) {
-    const decision = optOutByRow.get(member.row) ?? false;
+    const decision = optOutByRow.get(member.row) ?? {
+      needsReview: true,
+      why: 'Opt-out status could not be determined.',
+    };
     const sharedOptOutRows = member.phone.ok
       ? (optedOutRowsByPhone.get(member.phone.phone) ?? [])
         .filter((row) => row !== member.row)
@@ -262,6 +289,33 @@ export function checkList(members: Member[], duplicateGroups: DuplicateGroup[]):
   return buckets;
 }
 
+// Keep review-table and CSV reasons in the same plain language.
+export function formatReviewReason(reason: string): string {
+  if (reason === 'phone too short') return 'Phone too short. Check the number.';
+  if (reason === 'phone missing') return 'Phone missing. Add the number if available.';
+  if (reason === 'phone not a valid number') return 'Phone is not valid. Check the number.';
+
+  const duplicateEmail = reason.match(/^same email as row (\d+)$/);
+  if (duplicateEmail) return `Same email as row ${duplicateEmail[1]}. Keep one.`;
+
+  const duplicatePhone = reason.match(/^same phone as row (\d+)$/);
+  if (duplicatePhone) return `Same phone as row ${duplicatePhone[1]}. Confirm who uses it.`;
+
+  const sharedOptOut = reason.match(/^shared phone with opted-out row (\d+)$/);
+  if (sharedOptOut) {
+    return `Phone shared with opted-out row ${sharedOptOut[1]}. Keep everyone on it out of texts.`;
+  }
+
+  const sharedPhone = reason.match(/^shared phone with row (\d+)$/);
+  if (sharedPhone) return `Phone shared with row ${sharedPhone[1]}. Confirm who uses it.`;
+
+  if (reason.startsWith('Opt-out value') || reason.startsWith('Subscription status')) {
+    return `${reason.replace(/[.!?]+$/, '')}. Confirm permission before texting.`;
+  }
+
+  return `${reason.charAt(0).toUpperCase()}${reason.slice(1).replace(/[.!?]+$/, '')}.`;
+}
+
 // Add an apostrophe to spreadsheet formulas without changing clean phone numbers.
 function escapeSpreadsheetFormula(value: string): string {
   return /^[=+\-@]/.test(value) ? `'${value}` : value;
@@ -286,14 +340,47 @@ export function toCsv(bucket: CheckedMember[], headers: string[]): string {
     return candidate;
   };
 
-  const phoneCleanHeader = createColumnName('phone_clean');
-  const whyHeader = createColumnName('why');
-  const fields = [...headers, phoneCleanHeader, whyHeader];
-  const data = bucket.map((member) => [
-    ...headers.map((header) => escapeSpreadsheetFormula(member.original[header] ?? '')),
-    member.phone.ok ? member.phone.phone : '',
-    escapeSpreadsheetFormula(member.reasons.join('; ')),
-  ]);
+  const findReusableColumn = (
+    name: string,
+    valueFor: (member: CheckedMember) => string,
+  ): number => {
+    const index = headers.findIndex((header) => header.trim().toLowerCase() === name);
+    if (index === -1 || bucket.length === 0) return -1;
+
+    return bucket.every(
+      (member) => (member.original[headers[index]] ?? '') === valueFor(member),
+    ) ? index : -1;
+  };
+  const phoneCleanIndex = findReusableColumn(
+    'phone_clean',
+    (member) => member.phone.ok ? member.phone.phone : '',
+  );
+  const whyIndex = findReusableColumn(
+    'why',
+    (member) => member.reasons.map(formatReviewReason).join(' '),
+  );
+  const phoneCleanHeader = phoneCleanIndex === -1 ? createColumnName('phone_clean') : null;
+  const whyHeader = whyIndex === -1 ? createColumnName('why') : null;
+  const fields = [
+    ...headers,
+    ...(phoneCleanHeader ? [phoneCleanHeader] : []),
+    ...(whyHeader ? [whyHeader] : []),
+  ];
+  const data = bucket.map((member) => {
+    const phoneClean = member.phone.ok ? member.phone.phone : '';
+    const why = escapeSpreadsheetFormula(member.reasons.map(formatReviewReason).join(' '));
+    const originalColumns = headers.map((header, index) => {
+      if (index === phoneCleanIndex) return phoneClean;
+      if (index === whyIndex) return why;
+      return escapeSpreadsheetFormula(member.original[header] ?? '');
+    });
+
+    return [
+      ...originalColumns,
+      ...(phoneCleanIndex === -1 ? [phoneClean] : []),
+      ...(whyIndex === -1 ? [why] : []),
+    ];
+  });
   const csv = Papa.unparse({ fields, data }, { escapeFormulae: false });
 
   return `\uFEFF${csv}`;

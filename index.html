@@ -76,7 +76,6 @@
         <section class="example-preview" aria-labelledby="example-result-title">
           <h2 id="example-result-title" class="example-heading">Example result</h2>
           <div class="example-tiles">
-            <span class="example-label">Example</span>
             <div class="example-tile example-tile--ready">
               <svg class="example-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
@@ -130,6 +129,30 @@
             </svg>
             <span id="file-status-message"></span>
           </p>
+          <section id="opt-out-setup" class="opt-out-setup" aria-labelledby="opt-out-setup-title" hidden>
+            <h2 id="opt-out-setup-title">Opt-out check needed</h2>
+            <p id="opt-out-warning" role="alert">
+              We couldn't find an opt-out column. Choose it below, or confirm this list has none.
+            </p>
+            <p id="opt-out-confidence" class="opt-out-confidence"></p>
+            <label for="opt-out-column">Opt-out column</label>
+            <select id="opt-out-column">
+              <option value="">Choose a column</option>
+            </select>
+            <label for="opt-out-mode">How does this column work?</label>
+            <select id="opt-out-mode">
+              <option value="flag">A flag: yes means opted out</option>
+              <option value="status">A status: subscribed or unsubscribed</option>
+            </select>
+            <div class="opt-out-actions">
+              <button id="use-opt-out-column" class="button-primary" type="button" disabled>
+                Use this column
+              </button>
+              <button id="confirm-no-opt-outs" class="button-secondary" type="button">
+                This list has no opt-outs
+              </button>
+            </div>
+          </section>
           <button id="sample-button" class="link-button sample-link" type="button">No file handy? Try a sample list</button>
         </div>
       </section>
@@ -138,6 +161,7 @@
       <section id="results-card" class="card" aria-labelledby="results-title" hidden>
         <h1 id="results-title" class="results-title">Step 2 · Your results</h1>
         <p id="checked-file-name" class="checked-file-name"></p>
+        <p id="opt-out-note" class="opt-out-note"></p>
         <p id="summary" class="visually-hidden" aria-live="polite"></p>
 
         <div class="stat-tiles" aria-label="List results">
@@ -205,11 +229,13 @@
       </section>
     </main>
     <footer class="site-footer">
-      <p>
-        Built by Beverly Duran ·
-        <a href="https://github.com/duranbeverly/list-check">View the code on GitHub</a> ·
+      <nav class="footer-links" aria-label="Footer">
+        <span>Built by Beverly Duran</span>
+        <span class="footer-separator" aria-hidden="true">·</span>
+        <a href="https://github.com/duranbeverly/list-check">View the code on GitHub</a>
+        <span class="footer-separator" aria-hidden="true">·</span>
         <a href="https://github.com/duranbeverly/list-check#how-it-works">How it works</a>
-      </p>
+      </nav>
       <p class="footer-privacy">
         Privacy: <a href="https://github.com/duranbeverly/list-check#privacy">Read how your data stays local</a>.
       </p>

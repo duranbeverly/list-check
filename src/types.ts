@@ -4,12 +4,16 @@ export type PhoneResult =
   | { ok: false; why: 'missing' | 'too short' | 'not a valid number' };
 
 export type OptOutDecision = boolean | { needsReview: true; why: string };
+export type OptOutMode = 'flag' | 'status' | 'none' | null;
+export type ColumnConfidence = 'high' | 'suggested' | 'none' | 'confirmed';
 
 // Keep the matched header names for each member detail.
 export interface ColumnMapping {
   phone: string | null;
   email: string | null;
   optOut: string | null;
+  optOutMode: OptOutMode;
+  optOutConfidence: ColumnConfidence;
   firstName: string | null;
   lastName: string | null;
 }
@@ -23,6 +27,7 @@ export interface Member {
   lastName: string;
   email: string;
   optOut: string;
+  optOutMode: OptOutMode;
   phone: PhoneResult;
   original: RawRow;
 }

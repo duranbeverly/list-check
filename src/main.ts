@@ -1,9 +1,16 @@
 import '@fontsource/atkinson-hyperlegible/400.css';
 import '@fontsource/atkinson-hyperlegible/700.css';
 import Papa from 'papaparse';
-import { guessColumns } from './columns';
-import { checkList, findDuplicates, findFatalParseError, toCsv, toMembers } from './rules';
-import type { MemberBuckets } from './types';
+import { guessColumns, inferOptOutMode } from './columns';
+import {
+  checkList,
+  findDuplicates,
+  findFatalParseError,
+  formatReviewReason,
+  toCsv,
+  toMembers,
+} from './rules';
+import type { ColumnMapping, MemberBuckets, RawRow } from './types';
 import './style.css';
 
 function getRequiredElement<T extends Element>(
@@ -34,6 +41,13 @@ const selectedFile = getRequiredElement('selected-file', HTMLParagraphElement);
 const chooseDifferentFile = getRequiredElement('choose-different-file', HTMLButtonElement);
 const checkedFileName = getRequiredElement('checked-file-name', HTMLParagraphElement);
 const summary = getRequiredElement('summary', HTMLParagraphElement);
+const optOutNote = getRequiredElement('opt-out-note', HTMLParagraphElement);
+const optOutSetup = getRequiredElement('opt-out-setup', HTMLElement);
+const optOutConfidence = getRequiredElement('opt-out-confidence', HTMLParagraphElement);
+const optOutColumnSelect = getRequiredElement('opt-out-column', HTMLSelectElement);
+const optOutModeSelect = getRequiredElement('opt-out-mode', HTMLSelectElement);
+const useOptOutColumnButton = getRequiredElement('use-opt-out-column', HTMLButtonElement);
+const confirmNoOptOutsButton = getRequiredElement('confirm-no-opt-outs', HTMLButtonElement);
 const readyCount = getRequiredElement('ready-count', HTMLSpanElement);
 const reviewCount = getRequiredElement('review-count', HTMLSpanElement);
 const optedOutCount = getRequiredElement('opted-out-count', HTMLSpanElement);
@@ -52,6 +66,11 @@ let runCounter = 0;
 let currentBuckets: MemberBuckets | null = null;
 let currentFileName = '';
 let currentHeaders: string[] = [];
+let pendingOptOutResolution: {
+  fileName: string;
+  rows: RawRow[];
+  headers: string[];
+} | null = null;
 
 function setFileStatus(message: string, state?: 'error' | 'loading') {
   fileStatusMessage.textContent = message;
@@ -74,7 +93,13 @@ function clearResults() {
   currentBuckets = null;
   currentFileName = '';
   currentHeaders = [];
+  pendingOptOutResolution = null;
   resultsCard.hidden = true;
+  optOutSetup.hidden = true;
+  optOutColumnSelect.replaceChildren(new Option('Choose a column', ''));
+  optOutModeSelect.value = 'flag';
+  useOptOutColumnButton.disabled = true;
+  optOutNote.textContent = '';
   reviewTableBody.replaceChildren();
   reviewTable.hidden = true;
   reviewEmpty.hidden = true;
@@ -109,32 +134,6 @@ function isModifiedClick(event: MouseEvent): boolean {
     || event.metaKey
     || event.shiftKey
     || event.altKey;
-}
-
-function formatReviewReason(reason: string): string {
-  if (reason === 'phone too short') return 'Phone too short. Check the number.';
-  if (reason === 'phone missing') return 'Phone missing. Add the number if available.';
-  if (reason === 'phone not a valid number') return 'Phone is not valid. Check the number.';
-
-  const duplicateEmail = reason.match(/^same email as row (\d+)$/);
-  if (duplicateEmail) return `Same email as row ${duplicateEmail[1]}. Keep one.`;
-
-  const duplicatePhone = reason.match(/^same phone as row (\d+)$/);
-  if (duplicatePhone) return `Same phone as row ${duplicatePhone[1]}. Confirm who uses it.`;
-
-  const sharedOptOut = reason.match(/^shared phone with opted-out row (\d+)$/);
-  if (sharedOptOut) {
-    return `Phone shared with opted-out row ${sharedOptOut[1]}. Keep everyone on it out of texts.`;
-  }
-
-  const sharedPhone = reason.match(/^shared phone with row (\d+)$/);
-  if (sharedPhone) return `Phone shared with row ${sharedPhone[1]}. Confirm who uses it.`;
-
-  if (reason.startsWith('Opt-out value')) {
-    return `${reason}. Confirm permission before texting.`;
-  }
-
-  return `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`;
 }
 
 function renderReviewTable(buckets: MemberBuckets) {
@@ -246,7 +245,12 @@ function setDownloadButton(
   button.className = isPrimary ? 'button-primary' : 'button-secondary';
 }
 
-function renderReport(fileName: string, buckets: MemberBuckets, headers: string[]) {
+function renderReport(
+  fileName: string,
+  buckets: MemberBuckets,
+  headers: string[],
+  mappingMessage: string,
+) {
   currentBuckets = buckets;
   currentFileName = fileName;
   currentHeaders = headers;
@@ -258,10 +262,9 @@ function renderReport(fileName: string, buckets: MemberBuckets, headers: string[
   reviewCount.textContent = String(review);
   optedOutCount.textContent = String(optedOut);
   checkedFileName.textContent = fileName;
+  optOutNote.textContent = mappingMessage;
 
-  summary.textContent = ready + review + optedOut === 0
-    ? 'We found the column names but no people yet.'
-    : 'List checked. See the counts and next steps below.';
+  summary.textContent = `${ready} ready, ${review} to review, ${optedOut} opted out.`;
 
   if (ready > 0 && review > 0) {
     nextStep.textContent = `Import the ${ready} ready ${ready === 1 ? 'person' : 'people'} now. Check the ${review} below.`;
@@ -286,6 +289,88 @@ function renderReport(fileName: string, buckets: MemberBuckets, headers: string[
 
   chooseCard.hidden = true;
   resultsCard.hidden = false;
+}
+
+function renderParsedList(
+  fileName: string,
+  rows: RawRow[],
+  headers: string[],
+  columns: ColumnMapping,
+  mappingMessage: string,
+) {
+  const members = toMembers(rows, columns);
+  const duplicateGroups = findDuplicates(members);
+  const buckets = checkList(members, duplicateGroups);
+  setFileStatus('');
+  renderReport(fileName, buckets, headers, mappingMessage);
+}
+
+function requestOptOutResolution(
+  fileName: string,
+  rows: RawRow[],
+  headers: string[],
+  columns: ColumnMapping,
+) {
+  pendingOptOutResolution = { fileName, rows, headers };
+  optOutColumnSelect.replaceChildren(new Option('Choose a column', ''));
+  for (const header of headers) {
+    const option = document.createElement('option');
+    option.value = header;
+    option.textContent = header;
+    optOutColumnSelect.append(option);
+  }
+  optOutColumnSelect.value = columns.optOut ?? '';
+  optOutModeSelect.value = columns.optOutMode === 'status' ? 'status' : 'flag';
+  useOptOutColumnButton.disabled = !optOutColumnSelect.value;
+  optOutConfidence.textContent = columns.optOut
+    ? `Possible match (low confidence): ${columns.optOut}. Confirm it or choose another column.`
+    : 'No likely match found. Choose the column that records opt-outs, or confirm there is none.';
+  optOutSetup.hidden = false;
+  setFileStatus('');
+  optOutColumnSelect.focus();
+}
+
+function useSelectedOptOutColumn() {
+  const pending = pendingOptOutResolution;
+  const selectedColumn = optOutColumnSelect.value;
+  const mode = optOutModeSelect.value;
+  if (!pending || !selectedColumn) return;
+  if (mode !== 'flag' && mode !== 'status') {
+    throw new Error('Choose how the opt-out column is interpreted.');
+  }
+
+  const guessedColumns = guessColumns(pending.headers);
+  const columns: ColumnMapping = {
+    ...guessedColumns,
+    optOut: selectedColumn,
+    optOutMode: mode,
+    optOutConfidence: 'confirmed',
+  };
+  const mappingMessage = `Opt-out column selected: ${selectedColumn} (confirmed).`;
+  pendingOptOutResolution = null;
+  optOutSetup.hidden = true;
+  renderParsedList(pending.fileName, pending.rows, pending.headers, columns, mappingMessage);
+}
+
+function confirmNoOptOutColumn() {
+  const pending = pendingOptOutResolution;
+  if (!pending) return;
+
+  const columns: ColumnMapping = {
+    ...guessColumns(pending.headers),
+    optOut: null,
+    optOutMode: 'none',
+    optOutConfidence: 'confirmed',
+  };
+  pendingOptOutResolution = null;
+  optOutSetup.hidden = true;
+  renderParsedList(
+    pending.fileName,
+    pending.rows,
+    pending.headers,
+    columns,
+    'You confirmed this list has no opt-out column.',
+  );
 }
 
 function showFileError(message: string) {
@@ -325,17 +410,38 @@ function handleFile(file: File, existingRun?: number) {
         return;
       }
 
+      if (headers.some((header) => header.includes(';'))) {
+        showFileError(
+          'This file uses semicolons. Save it as comma-separated CSV and try again.',
+        );
+        return;
+      }
+
+      if (headers.some((header) => header.includes('\t'))) {
+        showFileError(
+          'This file uses tabs. Save it as comma-separated CSV and try again.',
+        );
+        return;
+      }
+
       const columns = guessColumns(headers);
       if (!columns.phone && !columns.email) {
         showFileError('No phone or email column found. Add one, then try again.');
         return;
       }
 
-      const members = toMembers(results.data, columns);
-      const duplicateGroups = findDuplicates(members);
-      const buckets = checkList(members, duplicateGroups);
-      setFileStatus('');
-      renderReport(file.name, buckets, headers);
+      if (columns.optOutConfidence !== 'high') {
+        requestOptOutResolution(file.name, results.data, headers, columns);
+        return;
+      }
+
+      renderParsedList(
+        file.name,
+        results.data,
+        headers,
+        columns,
+        `Opt-out column recognized with high confidence: ${columns.optOut}.`,
+      );
     },
     error: () => {
       if (runId !== runCounter) return;
@@ -381,6 +487,16 @@ fileInput.addEventListener('change', () => {
   if (file) processFile(file);
 });
 
+optOutColumnSelect.addEventListener('change', () => {
+  useOptOutColumnButton.disabled = !optOutColumnSelect.value;
+  if (optOutColumnSelect.value) {
+    optOutModeSelect.value = inferOptOutMode(optOutColumnSelect.value);
+  }
+});
+
+useOptOutColumnButton.addEventListener('click', useSelectedOptOutColumn);
+confirmNoOptOutsButton.addEventListener('click', confirmNoOptOutColumn);
+
 chooseDifferentFile.addEventListener('click', () => fileInput.click());
 
 sampleButton.addEventListener('click', async () => {
@@ -406,6 +522,16 @@ sampleButton.addEventListener('click', async () => {
     }
   }
 });
+
+function enableTransitions() {
+  document.documentElement.classList.add('app-ready');
+}
+
+if (document.readyState === 'complete') {
+  enableTransitions();
+} else {
+  window.addEventListener('load', enableTransitions, { once: true });
+}
 
 downloadReadyButton.addEventListener('click', () => downloadBucket('ready'));
 downloadReviewButton.addEventListener('click', () => downloadBucket('needsReview'));

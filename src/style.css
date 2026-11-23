@@ -178,12 +178,6 @@ h3 {
   padding: var(--space-1);
 }
 
-.example-label {
-  color: var(--color-muted);
-  font-weight: 700;
-  grid-column: 1 / -1;
-}
-
 .example-tile {
   align-items: center;
   border-radius: var(--radius-control);
@@ -224,7 +218,7 @@ h3 {
   flex-wrap: wrap;
   gap: var(--space-2);
   list-style: none;
-  margin: 0 0 var(--space-3);
+  margin: var(--space-2) 0 var(--space-3);
   padding: 0;
 }
 
@@ -371,6 +365,56 @@ h3 {
   outline-offset: var(--space-1);
 }
 
+.opt-out-setup {
+  align-items: stretch;
+  background: var(--color-review-tint);
+  border-left: 4px solid var(--color-review);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  text-align: left;
+  width: 100%;
+}
+
+.opt-out-setup h2 {
+  font-size: var(--font-size-subhead);
+  margin: 0;
+}
+
+.opt-out-setup p {
+  margin: 0;
+}
+
+.opt-out-confidence,
+.opt-out-note {
+  color: var(--color-muted);
+}
+
+.opt-out-setup select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-functional);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font: inherit;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  width: 100%;
+}
+
+.opt-out-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.opt-out-actions .button-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 button,
 a {
   font: inherit;
@@ -411,6 +455,11 @@ a:focus-visible {
   color: var(--color-muted);
   margin: 0 0 var(--space-2);
   max-width: 65ch;
+  overflow-wrap: anywhere;
+}
+
+.opt-out-note {
+  margin: 0 0 var(--space-2);
   overflow-wrap: anywhere;
 }
 
@@ -579,7 +628,18 @@ a:focus-visible {
   margin: 0;
 }
 
-.site-footer p + p {
+.footer-links {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-1);
+}
+
+.footer-separator {
+  color: var(--color-muted);
+}
+
+.site-footer .footer-privacy {
   margin-top: var(--space-1);
 }
 
@@ -590,10 +650,10 @@ a:focus-visible {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  a,
-  button,
-  .upload-zone,
-  .upload-action {
+  html.app-ready a,
+  html.app-ready button,
+  html.app-ready .upload-zone,
+  html.app-ready .upload-action {
     transition:
       background-color 150ms ease,
       border-color 150ms ease,
@@ -677,6 +737,15 @@ a:focus-visible {
 
   .site-footer {
     padding: 0 var(--space-2) var(--space-3);
+  }
+
+  .footer-links {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .footer-separator {
+    display: none;
   }
 
   .review-table {

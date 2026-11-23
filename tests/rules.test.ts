@@ -7,6 +7,7 @@ import {
   cleanPhone,
   findDuplicates,
   findFatalParseError,
+  formatReviewReason,
   isOptOut,
   toCsv,
   toMembers,
@@ -198,6 +199,16 @@ describe('isOptOut', () => {
       why: 'Opt-out value "maybe" is unclear.',
     });
   });
+
+  it('interprets subscription statuses in the opposite direction from opt-out flags', () => {
+    expect(isOptOut('unsubscribed', 'status')).toBe(true);
+    expect(isOptOut('subscribed', 'status')).toBe(false);
+    expect(isOptOut('unknown', 'status')).toMatchObject({ needsReview: true });
+  });
+
+  it('does not treat an unconfirmed opt-out column as permission', () => {
+    expect(isOptOut('', null)).toMatchObject({ needsReview: true });
+  });
 });
 
 describe('checkList', () => {
@@ -231,9 +242,61 @@ describe('checkList', () => {
       .toContain('shared phone with opted-out row 13');
     expect(buckets.needsReview.some((member) => member.row === 12 || member.row === 13)).toBe(false);
   });
+
+  it('keeps people out of ready when no opt-out column is mapped', () => {
+    const rows: RawRow[] = [{
+      first_name: 'Ana',
+      email: 'ana@example.com',
+      phone: '571-555-0101',
+    }];
+    const members = toMembers(rows, guessColumns(Object.keys(rows[0])));
+    const buckets = checkList(members, []);
+
+    expect(buckets.ready).toHaveLength(0);
+    expect(buckets.needsReview).toHaveLength(1);
+    expect(buckets.needsReview[0].reasons).toContain('Opt-out column not confirmed.');
+  });
+
+  it('uses subscription status meaning for an Action Network list', () => {
+    const headers = ['first_name', 'email', 'can2_phone', 'can2_sms_status'];
+    const rows: RawRow[] = [
+      {
+        first_name: 'Ana',
+        email: 'ana@example.com',
+        can2_phone: '571-555-0101',
+        can2_sms_status: 'subscribed',
+      },
+      {
+        first_name: 'Omar',
+        email: 'omar@example.com',
+        can2_phone: '571-555-0102',
+        can2_sms_status: 'unsubscribed',
+      },
+    ];
+    const members = toMembers(rows, guessColumns(headers));
+    const buckets = checkList(members, findDuplicates(members));
+
+    expect(buckets.ready.map((member) => member.firstName)).toEqual(['Ana']);
+    expect(buckets.optedOut.map((member) => member.firstName)).toEqual(['Omar']);
+  });
 });
 
 describe('toCsv', () => {
+  it('exports the same plain-language review reason used in the report', () => {
+    const original: RawRow = { first_name: 'Ana', phone: '555-01' };
+    const headers = Object.keys(original);
+    const columns = { ...guessColumns(headers), optOutMode: 'none' as const };
+    const [member] = toMembers([original], columns);
+    const [checkedMember] = checkList([member], []).needsReview;
+    const csv = toCsv([checkedMember], headers);
+    const parsed = Papa.parse<Record<string, string>>(csv, { header: true });
+    expect(checkedMember.reasons).toContain('phone too short');
+    const expectedReason = formatReviewReason('phone too short');
+
+    expect(expectedReason).toBe('Phone too short. Check the number.');
+    expect(parsed.data[0].why).toBe(expectedReason);
+  });
+
   // Keep original values and order while adding unique, safe export columns.
   it('preserves headers, avoids collisions, and leaves phone_clean importable', () => {
     const original: RawRow = {
