@@ -9,7 +9,7 @@ if (!fileInput) {
   throw new Error('File input element not found');
 }
 
-fileInput.addEventListener('change', (event) => {
+fileInput.addEventListener('change', () => {
   const file = (fileInput.files?.[0]);
   if (file) {
     // Handle the selected CSV file here
@@ -26,4 +26,4 @@ fileInput.addEventListener('change', (event) => {
   }
 }); 
 
-// Parse the CSV file using PapaParse and skip empty lines  
+// Parse the CSV file using PapaParse and skip empty lines
