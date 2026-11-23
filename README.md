@@ -44,7 +44,7 @@ The app is tested with lists of up to 100,000 people. Larger files may take long
 ## Testing
 
 - `npm test` runs the unit, property-based, CSV fixture, and golden-file tests.
-- `npm run test:e2e` builds the production site and runs Playwright in Chromium, Firefox, and WebKit. The browser tests cover privacy, downloads, keyboard use, axe accessibility checks, and visual snapshots.
+- `npm run test:e2e` builds the production site and runs Playwright in Chromium, Firefox, and WebKit. The browser tests cover privacy, downloads, keyboard use, and axe accessibility checks.
 - GitHub Actions runs the unit and browser tests for changes to `main` and pull requests.
 
 ## Run locally

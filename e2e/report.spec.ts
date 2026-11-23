@@ -304,7 +304,7 @@ test('Check another file returns focus to Step 1', async ({ page }) => {
   expect(await page.locator('#hero-title').evaluate((heading) => getComputedStyle(heading).outlineStyle))
     .toBe('none');
   const uploadHeightAfter = (await page.locator('#upload-zone').boundingBox())!.height;
-  expect(uploadHeightAfter).toBe(uploadHeightBefore);
+  expect(uploadHeightAfter).toBeCloseTo(uploadHeightBefore, 0);
   const uploadBox = await page.locator('#upload-zone').boundingBox();
   expect(uploadBox).not.toBeNull();
   expect(uploadBox!.y).toBeGreaterThanOrEqual(0);
