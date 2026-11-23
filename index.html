@@ -31,8 +31,8 @@
     <main id="app">
       <!-- Keep the app name visible in both steps. -->
       <header class="site-header">
-        <a class="wordmark" href="%BASE_URL%" aria-label="list-check home">
-          <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+        <a id="wordmark" class="wordmark" href="%BASE_URL%" aria-label="list-check home">
+          <svg class="brand-mark" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="1" y="1" width="22" height="22" rx="5" fill="var(--color-brand)" />
             <path d="m20 6-11 11-5-5" fill="none" stroke="var(--color-surface)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
           </svg>
@@ -43,30 +43,30 @@
       <!-- Help visitors choose a list and understand what the tool does. -->
       <section id="choose-card" class="card" aria-labelledby="hero-title">
         <p class="step-label">Step 1 · Choose your list</p>
-        <h1 id="hero-title" class="hero-title">Make a member list safe to text</h1>
+        <h1 id="hero-title" class="hero-title" tabindex="-1">Make a member list safe to text</h1>
         <p class="hero-subhead">Drop in a spreadsheet. Get back a clean list, the people to check, and everyone who opted out.</p>
         <ul class="benefits" aria-label="What List Check does">
           <li>
-            <svg class="benefit-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <svg class="benefit-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
             </svg>
-            <span>Cleans phone numbers</span>
+            <span>Cleans phones</span>
           </li>
           <li>
-            <svg class="benefit-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <svg class="benefit-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
             </svg>
             <span>Flags duplicates</span>
           </li>
           <li>
-            <svg class="benefit-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <svg class="benefit-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
               <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
             </svg>
             <span>Keeps opt-outs out</span>
           </li>
         </ul>
         <p id="privacy-note" class="privacy-note">
-          <svg class="trust-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <svg class="trust-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="3" y="11" width="18" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
           </svg>
@@ -76,8 +76,9 @@
         <section class="example-preview" aria-labelledby="example-result-title">
           <h2 id="example-result-title" class="example-heading">Example result</h2>
           <div class="example-tiles">
+            <span class="example-label">Example</span>
             <div class="example-tile example-tile--ready">
-              <svg class="example-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="example-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
                 <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
               </svg>
@@ -85,7 +86,7 @@
               <span>Ready</span>
             </div>
             <div class="example-tile example-tile--review">
-              <svg class="example-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="example-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m10.29 3.86-8.2 14.14A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.73-3l-8.2-14.14a2 2 0 0 0-3.42 0Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
                 <path d="M12 9v4m0 4h.01" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
               </svg>
@@ -93,7 +94,7 @@
               <span>To review</span>
             </div>
             <div class="example-tile example-tile--opted-out">
-              <svg class="example-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="example-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
                 <path d="m4.9 4.9 14.2 14.2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
               </svg>
@@ -107,7 +108,7 @@
           <!-- Keep the real file input keyboard and screen-reader accessible. -->
           <input id="file-input" class="visually-hidden" type="file" accept=".csv" aria-describedby="upload-hint">
           <label class="upload-content" for="file-input">
-            <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <svg class="upload-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
               <path d="M14 2v4a2 2 0 0 0 2 2h4m-8 4v6m3-3-3-3-3 3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
             </svg>
@@ -120,11 +121,11 @@
           <p id="selected-file" class="selected-file" hidden></p>
           <button id="choose-different-file" class="link-button" type="button" hidden>Choose a different file</button>
           <p id="file-status" class="file-status" role="status" aria-live="polite" tabindex="-1" hidden>
-            <svg id="file-status-icon" class="file-status-icon" viewBox="0 0 24 24" aria-hidden="true" hidden>
+            <svg id="file-status-icon" class="file-status-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" hidden>
               <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" />
               <path d="M12 8v4m0 4h.01" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
             </svg>
-            <svg id="loading-spinner" class="loading-spinner" viewBox="0 0 24 24" aria-hidden="true" hidden>
+            <svg id="loading-spinner" class="loading-spinner" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" hidden>
               <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
             </svg>
             <span id="file-status-message"></span>
@@ -137,12 +138,12 @@
       <section id="results-card" class="card" aria-labelledby="results-title" hidden>
         <h1 id="results-title" class="results-title">Step 2 · Your results</h1>
         <p id="checked-file-name" class="checked-file-name"></p>
-        <p id="summary" class="report-headline" aria-live="polite"></p>
+        <p id="summary" class="visually-hidden" aria-live="polite"></p>
 
         <div class="stat-tiles" aria-label="List results">
           <div id="ready-tile" class="stat-tile stat-tile--ready">
             <span class="stat-number">
-              <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="status-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
                 <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
               </svg>
@@ -152,7 +153,7 @@
           </div>
           <div id="review-tile" class="stat-tile stat-tile--review">
             <span class="stat-number">
-              <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="status-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="m10.29 3.86-8.2 14.14A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.73-3l-8.2-14.14a2 2 0 0 0-3.42 0Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
                 <path d="M12 9v4m0 4h.01" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
               </svg>
@@ -162,7 +163,7 @@
           </div>
           <div id="opted-out-tile" class="stat-tile stat-tile--opted-out">
             <span class="stat-number">
-              <svg class="status-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <svg class="status-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
                 <path d="m4.9 4.9 14.2 14.2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
               </svg>

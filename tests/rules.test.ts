@@ -15,7 +15,7 @@ import type { RawRow } from '../src/types';
 
 // Load the real sample with blank lines preserved for accurate row numbers.
 function parseSample(csv = readFileSync(new URL('../public/sample-members.csv', import.meta.url), 'utf8')) {
-  return Papa.parse<RawRow>(csv, { header: true, skipEmptyLines: false });
+  return Papa.parse<RawRow>(csv, { header: true, skipEmptyLines: false, delimiter: ',' });
 }
 
 function loadSampleMembers(csv?: string) {
@@ -85,6 +85,16 @@ describe('CSV parsing', () => {
     );
 
     expect(findFatalParseError(results.errors, results.data)).toBeNull();
+  });
+
+  it('accepts a two-column CSV ending with a newline when the comma delimiter is explicit', () => {
+    const results = Papa.parse<RawRow>(
+      'phone,city\n571-555-0101,Reston\n',
+      { header: true, skipEmptyLines: false, delimiter: ',' },
+    );
+
+    expect(findFatalParseError(results.errors, results.data)).toBeNull();
+    expect(toMembers(results.data, guessColumns(results.meta.fields ?? []))).toHaveLength(1);
   });
 });
 

@@ -76,7 +76,7 @@ export function toMembers(rows: RawRow[], columns: ColumnMapping): Member[] {
   });
 }
 
-// Ignore only the short-row warning caused by a truly blank line.
+// Ignore warnings caused by blank lines or delimiter detection on an empty list.
 export function findFatalParseError(
   errors: ReadonlyArray<{ code: string; row?: number }>,
   rows: RawRow[],

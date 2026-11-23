@@ -8,7 +8,7 @@ import type { RawRow } from '../src/types';
 // Keep the real sample working through the full list-checking flow.
 it('processes every sample member with correct rows and safety buckets', () => {
   const csv = readFileSync(new URL('../public/sample-members.csv', import.meta.url), 'utf8');
-  const parsed = Papa.parse<RawRow>(csv, { header: true, skipEmptyLines: false });
+  const parsed = Papa.parse<RawRow>(csv, { header: true, skipEmptyLines: false, delimiter: ',' });
 
   expect(parsed.errors.some((error) => error.code === 'TooFewFields')).toBe(true);
   expect(findFatalParseError(parsed.errors, parsed.data)).toBeNull();

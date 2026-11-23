@@ -117,6 +117,11 @@ h1 {
   margin: 0 0 var(--space-2);
 }
 
+.hero-title:focus {
+  outline: 3px solid var(--color-brand);
+  outline-offset: var(--space-1);
+}
+
 h2,
 h3 {
   font-size: var(--font-size-card-heading);
@@ -165,9 +170,18 @@ h3 {
 }
 
 .example-tiles {
+  border: 1px dashed var(--color-border-decorative);
+  border-radius: var(--radius-control);
   display: grid;
   gap: var(--space-1);
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: var(--space-1);
+}
+
+.example-label {
+  color: var(--color-muted);
+  font-weight: 700;
+  grid-column: 1 / -1;
 }
 
 .example-tile {
@@ -219,7 +233,7 @@ h3 {
   background: var(--color-brand-tint);
   border-radius: var(--radius-badge);
   display: flex;
-  flex: 1 1 0;
+  flex: 0 0 auto;
   gap: var(--space-1);
   min-width: 0;
   padding: var(--space-1) var(--space-2);
@@ -391,13 +405,6 @@ a:focus-visible {
 .link-button:hover,
 .site-footer a:hover {
   color: var(--color-brand-hover);
-}
-
-.report-headline {
-  font-size: var(--font-size-subhead);
-  font-weight: 700;
-  margin: 0 0 var(--space-2);
-  max-width: 65ch;
 }
 
 .checked-file-name {
@@ -578,6 +585,8 @@ a:focus-visible {
 
 .site-footer a {
   color: var(--color-brand);
+  display: inline-block;
+  padding: var(--space-1) 0;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -623,7 +632,7 @@ a:focus-visible {
   }
 
   .benefits li {
-    flex-basis: calc(50% - var(--space-1));
+    flex-basis: auto;
   }
 
   .example-tile {
@@ -641,7 +650,19 @@ a:focus-visible {
   }
 
   .stat-tiles {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-1);
+  }
+
+  .stat-tile {
+    align-items: center;
+    padding: var(--space-1);
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: var(--font-size-section-heading);
+    gap: 0;
   }
 
   .download-actions {
@@ -685,20 +706,49 @@ a:focus-visible {
 
   .review-table tr {
     border-bottom: 1px solid var(--color-border-decorative);
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
     padding: var(--space-1) 0;
   }
 
-  .review-table td {
+  .review-table td[data-label="Row"],
+  .review-table td[data-label="Name"] {
     border: 0;
-    display: grid;
-    gap: var(--space-1);
-    grid-template-columns: 7rem minmax(0, 1fr);
+    display: inline-flex;
+    width: auto;
     padding: 0 var(--space-1);
   }
 
-  .review-table td::before {
-    content: attr(data-label);
-    font-weight: 700;
+  .review-table td[data-label="Row"] {
+    grid-column: 1;
+  }
+
+  .review-table td[data-label="Row"]::before,
+  .review-table td[data-label="Name"]::before {
+    content: none;
+  }
+
+  .review-table td[data-label="Row"]::after {
+    content: "·";
+    margin-left: var(--space-1);
+  }
+
+  .review-table td[data-label="Name"] {
+    grid-column: 2;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .review-table td[data-label="What to check"],
+  .review-table td[colspan] {
+    border: 0;
+    display: block;
+    grid-column: 1 / -1;
+    width: auto;
+  }
+
+  .review-table td[data-label="What to check"]::before {
+    content: none;
   }
 }
 

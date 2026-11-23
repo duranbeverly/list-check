@@ -18,6 +18,8 @@ function getRequiredElement<T extends Element>(
 }
 
 const fileInput = getRequiredElement('file-input', HTMLInputElement);
+const wordmark = getRequiredElement('wordmark', HTMLAnchorElement);
+const stepOneHeading = getRequiredElement('hero-title', HTMLHeadingElement);
 const uploadZone = getRequiredElement('upload-zone', HTMLDivElement);
 const uploadPrompt = getRequiredElement('upload-prompt', HTMLElement);
 const dropInstruction = getRequiredElement('drop-instruction', HTMLElement);
@@ -81,6 +83,34 @@ function clearResults() {
   downloadOptedOutButton.hidden = true;
 }
 
+function scrollToTop() {
+  const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 'auto'
+    : 'smooth';
+  window.scrollTo({ top: 0, behavior });
+}
+
+function showStepOne() {
+  ++runCounter;
+  clearResults();
+  chooseCard.hidden = false;
+  setFileStatus('Started over. Choose a file to check.');
+  selectedFile.textContent = '';
+  selectedFile.hidden = true;
+  chooseDifferentFile.hidden = true;
+  fileInput.value = '';
+  scrollToTop();
+  stepOneHeading.focus({ preventScroll: true });
+}
+
+function isModifiedClick(event: MouseEvent): boolean {
+  return event.button !== 0
+    || event.ctrlKey
+    || event.metaKey
+    || event.shiftKey
+    || event.altKey;
+}
+
 function formatReviewReason(reason: string): string {
   if (reason === 'phone too short') return 'Phone too short. Check the number.';
   if (reason === 'phone missing') return 'Phone missing. Add the number if available.';
@@ -122,7 +152,7 @@ function renderReviewTable(buckets: MemberBuckets) {
         'opted-out',
       );
     } else {
-      setReviewEmptyMessage('No people found. Check the first row has column names.');
+      setReviewEmptyMessage('We found the column names but no people yet.');
     }
     return;
   }
@@ -174,6 +204,8 @@ function setReviewEmptyMessage(
   if (state) {
     const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     icon.setAttribute('class', 'review-empty-icon');
+    icon.setAttribute('width', '24');
+    icon.setAttribute('height', '24');
     icon.setAttribute('viewBox', '0 0 24 24');
     icon.setAttribute('aria-hidden', 'true');
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -227,19 +259,9 @@ function renderReport(fileName: string, buckets: MemberBuckets, headers: string[
   optedOutCount.textContent = String(optedOut);
   checkedFileName.textContent = fileName;
 
-  if (ready === 0 && review === 0 && optedOut === 0) {
-    summary.textContent = 'No people found. Check the first row has column names.';
-  } else if (review === 0 && ready === 0 && optedOut > 0) {
-    summary.textContent = 'Everyone opted out. No one is ready to import.';
-  } else if (review === 0) {
-    summary.textContent = 'Everyone looks ready to import.';
-  } else if (ready === 0) {
-    summary.textContent = 'No one is ready yet. Check the people to review below.';
-  } else if (ready > 0 && review > 0) {
-    summary.textContent = `${ready} ${ready === 1 ? 'person is' : 'people are'} ready to import.`;
-  } else {
-    summary.textContent = 'No one is ready yet. Check the people to review below.';
-  }
+  summary.textContent = ready + review + optedOut === 0
+    ? 'We found the column names but no people yet.'
+    : 'List checked. See the counts and next steps below.';
 
   if (ready > 0 && review > 0) {
     nextStep.textContent = `Import the ${ready} ready ${ready === 1 ? 'person' : 'people'} now. Check the ${review} below.`;
@@ -286,6 +308,7 @@ function handleFile(file: File, existingRun?: number) {
     header: true,
     skipEmptyLines: false,
     encoding: 'UTF-8',
+    delimiter: ',',
     complete: (results) => {
       if (runId !== runCounter) return;
 
@@ -297,6 +320,11 @@ function handleFile(file: File, existingRun?: number) {
       }
 
       const headers = results.meta.fields ?? [];
+      if (headers.length === 0) {
+        showFileError('This file is empty. Choose a file with a header row and people.');
+        return;
+      }
+
       const columns = guessColumns(headers);
       if (!columns.phone && !columns.email) {
         showFileError('No phone or email column found. Add one, then try again.');
@@ -383,21 +411,21 @@ downloadReadyButton.addEventListener('click', () => downloadBucket('ready'));
 downloadReviewButton.addEventListener('click', () => downloadBucket('needsReview'));
 downloadOptedOutButton.addEventListener('click', () => downloadBucket('optedOut'));
 
-checkAnotherButton.addEventListener('click', (event) => {
+wordmark.addEventListener('click', (event) => {
+  if (isModifiedClick(event)) return;
   event.preventDefault();
-  ++runCounter;
-  clearResults();
-  chooseCard.hidden = false;
-  setFileStatus('');
-  selectedFile.textContent = '';
-  selectedFile.hidden = true;
-  chooseDifferentFile.hidden = true;
-  fileInput.value = '';
-  const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ? 'auto'
-    : 'smooth';
-  uploadZone.scrollIntoView({ behavior, block: 'center' });
-  fileInput.focus({ preventScroll: true });
+
+  if (resultsCard.hidden) {
+    scrollToTop();
+  } else {
+    showStepOne();
+  }
+});
+
+checkAnotherButton.addEventListener('click', (event) => {
+  if (isModifiedClick(event)) return;
+  event.preventDefault();
+  showStepOne();
 });
 
 let dragDepth = 0;
