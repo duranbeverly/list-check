@@ -1,5 +1,6 @@
 // Load the CSV reader and page styles.
 import Papa from 'papaparse';
+import { guessColumns } from './columns';
 import './style.css';
 
 // Find the controls and result area.
@@ -40,17 +41,33 @@ function handleFile(file: File) {
         return;
       }
 
-      // Show the people count and column names.
+      // Check for a contact column and prepare the summary.
+      const headers = results.meta.fields ?? [];
+      const guessedColumns = guessColumns(headers);
+      if (!guessedColumns.phone && !guessedColumns.email) {
+        summaryParagraph.textContent = `No phone or email column was found in ${file.name}. Check that the first row has a phone or email column header.`;
+        return;
+      }
+
       const count = results.data.length;
       const message = count === 0
         ? `No people found in ${file.name}.`
         : `${count} ${count === 1 ? 'person' : 'people'} found in ${file.name}.`;
-      const columns = (results.meta.fields ?? []).join(', ') || 'none';
+      const columns = headers.join(', ') || 'none';
+      const matches = [
+        `Phone: ${guessedColumns.phone ?? 'not found'}`,
+        `Email: ${guessedColumns.email ?? 'not found'}`,
+        `Opt-out: ${guessedColumns.optOut ?? 'not found'}`,
+        `First name: ${guessedColumns.firstName ?? 'not found'}`,
+        `Last name: ${guessedColumns.lastName ?? 'not found'}`,
+      ].join(' · ');
 
       summaryParagraph.replaceChildren(
         document.createTextNode(message),
         document.createElement('br'),
         document.createTextNode(`Columns: ${columns}`),
+        document.createElement('br'),
+        document.createTextNode(`Matches: ${matches}`),
       );
     },
 
