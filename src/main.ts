@@ -1,7 +1,7 @@
 // Load the CSV reader and page styles.
 import Papa from 'papaparse';
 import { guessColumns } from './columns';
-import { toMembers } from './rules';
+import { findFatalParseError, toMembers } from './rules';
 import './style.css';
 import type { RawRow } from './types';
 
@@ -37,9 +37,15 @@ function handleFile(file: File) {
     encoding: 'UTF-8',
 
     complete: (results) => {
-      // Explain any issues found in the file.
-      if (results.errors.length > 0) {
-        summaryParagraph.textContent = `We couldn't read ${file.name} correctly. Please check that it's a valid CSV file.`;
+      // Ignore blank-line warnings but explain real row problems.
+      const fatalError = findFatalParseError(results.errors, results.data);
+      if (fatalError) {
+        const hasFieldMismatch = fatalError.code === 'TooFewFields' || fatalError.code === 'TooManyFields';
+        summaryParagraph.textContent = hasFieldMismatch && fatalError.row !== undefined
+          ? `Row ${fatalError.row + 2} in ${file.name} doesn't match the header. Check that each row has the same number of columns as the first row.`
+          : hasFieldMismatch
+            ? `A row in ${file.name} doesn't match the header. Check that each row has the same number of columns as the first row.`
+            : `We couldn't read ${file.name} correctly. Please check that it's a valid CSV file.`;
         return;
       }
 

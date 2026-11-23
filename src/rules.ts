@@ -31,7 +31,7 @@ export function cleanPhone(value: string, country: CountryCode = 'US'): PhoneRes
 export function toMembers(rows: RawRow[], columns: ColumnMapping): Member[] {
   return rows.flatMap((original, index) => {
     const row = index + 2;
-    if (Object.values(original).every((value) => (value ?? '').trim() === '')) {
+    if (isBlankRow(original)) {
       return [];
     }
 
@@ -46,6 +46,22 @@ export function toMembers(rows: RawRow[], columns: ColumnMapping): Member[] {
       original,
     }];
   });
+}
+
+// Ignore only the short-row warning caused by a truly blank line.
+export function findFatalParseError(
+  errors: ReadonlyArray<{ code: string; row?: number }>,
+  rows: RawRow[],
+): { code: string; row?: number } | null {
+  return errors.find((error) => {
+    const row = error.row === undefined ? undefined : rows[error.row];
+    return !(error.code === 'TooFewFields' && row !== undefined && isBlankRow(row));
+  }) ?? null;
+}
+
+// Treat rows containing only blank cells as empty.
+function isBlankRow(row: RawRow): boolean {
+  return Object.values(row).every((value) => (value ?? '').trim() === '');
 }
 
 // Add each member to the group for a matching key.

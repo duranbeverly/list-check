@@ -2,13 +2,17 @@ import { readFileSync } from 'node:fs';
 import Papa from 'papaparse';
 import { describe, expect, it } from 'vitest';
 import { guessColumns } from '../src/columns';
-import { cleanPhone, findDuplicates, toMembers } from '../src/rules';
+import { cleanPhone, findDuplicates, findFatalParseError, toMembers } from '../src/rules';
 import type { RawRow } from '../src/types';
 
 // Load the real sample with blank lines preserved for accurate row numbers.
-function loadSampleMembers() {
+function parseSample() {
   const csv = readFileSync(new URL('../public/sample-members.csv', import.meta.url), 'utf8');
-  const results = Papa.parse<RawRow>(csv, { header: true, skipEmptyLines: false });
+  return Papa.parse<RawRow>(csv, { header: true, skipEmptyLines: false });
+}
+
+function loadSampleMembers() {
+  const results = parseSample();
   const columns = guessColumns(results.meta.fields ?? []);
 
   return toMembers(results.data, columns);
@@ -44,6 +48,27 @@ describe('cleanPhone', () => {
     if (result.ok) {
       expect(cleanPhone(result.phone)).toEqual(result);
     }
+  });
+});
+
+describe('CSV parsing', () => {
+  // Keep the sample usable while retaining its real file row numbers.
+  it('loads all 16 sample members without fatal parse errors', () => {
+    const results = parseSample();
+    const columns = guessColumns(results.meta.fields ?? []);
+
+    expect(findFatalParseError(results.errors, results.data)).toBeNull();
+    expect(toMembers(results.data, columns)).toHaveLength(16);
+  });
+
+  // Continue to report a row that is incomplete rather than blank.
+  it('treats a non-empty short row as a fatal parse error', () => {
+    const results = Papa.parse<RawRow>(
+      'first_name,last_name,email,phone\nGrace,Kim,grace@example.com',
+      { header: true, skipEmptyLines: false },
+    );
+
+    expect(findFatalParseError(results.errors, results.data)).toMatchObject({ code: 'TooFewFields' });
   });
 });
 
