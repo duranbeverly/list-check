@@ -2,29 +2,42 @@ import Papa from 'papaparse';
 import './style.css';
 
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
+const sampleButton = document.getElementById('sample-button') as HTMLButtonElement;
 
-// Throw an error if the file input element is not found
+// Make sure the upload control is on the page.
 if (!fileInput) {
   throw new Error('File input element not found');
 }
 
+// Make sure the sample-list button is on the page.
+if (!sampleButton) {
+  throw new Error('Sample button element not found');
+}
+
+// Read the selected file and share a clear result.
 function handleFile(file: File) {
   const summaryParagraph = document.getElementById('summary') as HTMLParagraphElement;
   if (!summaryParagraph) {
     throw new Error('Summary paragraph element not found');
   }
 
+  // Let people know the file is being read.
   summaryParagraph.textContent = `Reading ${file.name}…`;
+
+  // Use the first row as column names and ignore blank lines.
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     encoding: 'UTF-8',
+
     complete: (results) => {
+      // Explain any issues found in the file.
       if (results.errors.length > 0) {
         summaryParagraph.textContent = `We couldn't read ${file.name} correctly. Please check that it's a valid CSV file.`;
         return;
       }
 
+      // Show the people count and column names.
       const count = results.data.length;
       const message = count === 0
         ? `No people found in ${file.name}.`
@@ -37,15 +50,42 @@ function handleFile(file: File) {
         document.createTextNode(`Columns: ${columns}`),
       );
     },
+
+    // Help people recover if the file cannot be opened.
     error: () => {
       summaryParagraph.textContent = `We couldn't read ${file.name}. Please try another CSV file.`;
     },
   });
 }
 
+// Handle a newly selected file.
 fileInput.addEventListener('change', () => {
   const file = fileInput.files?.[0];
   if (file) {
     handleFile(file);
+  }
+});
+
+// Load the sample list and send it through the same file-reading flow.
+sampleButton.addEventListener('click', async () => {
+  const summaryParagraph = document.getElementById('summary') as HTMLParagraphElement;
+  if (!summaryParagraph) {
+    throw new Error('Summary paragraph element not found');
+  }
+
+  summaryParagraph.textContent = 'Loading the sample list…';
+
+  try {
+    const response = await fetch(import.meta.env.BASE_URL + 'sample-members.csv');
+    if (!response.ok) {
+      summaryParagraph.textContent = `The sample list couldn't be loaded. Please try again.`;
+      return;
+    }
+
+    const contents = await response.text();
+    const file = new File([contents], 'sample-members.csv', { type: 'text/csv' });
+    handleFile(file);
+  } catch {
+    summaryParagraph.textContent = `The sample list couldn't be loaded. Please try again.`;
   }
 });
