@@ -16,7 +16,8 @@ export function connectUpload(actions: UploadActions) {
   const dropInstruction = getRequiredElement('drop-instruction', HTMLElement);
   const sampleButton = getRequiredElement('sample-button', HTMLButtonElement);
   const chooseDifferentFile = getRequiredElement('choose-different-file', HTMLButtonElement);
-  const selectedFile = getRequiredElement('selected-file', HTMLParagraphElement);
+  const selectedFile = getRequiredElement('selected-file', HTMLDivElement);
+  const selectedFileName = getRequiredElement('selected-file-name', HTMLSpanElement);
   const fileStatus = getRequiredElement('file-status', HTMLParagraphElement);
   const fileStatusIcon = getRequiredElement('file-status-icon', SVGSVGElement);
   const loadingSpinner = getRequiredElement('loading-spinner', SVGSVGElement);
@@ -40,9 +41,11 @@ export function connectUpload(actions: UploadActions) {
   }
 
   function setSelectedFile(fileName: string | null) {
-    selectedFile.textContent = fileName ? `Selected file: ${fileName}` : '';
+    selectedFileName.textContent = fileName ?? '';
     selectedFile.hidden = !fileName;
     chooseDifferentFile.hidden = !fileName;
+    sampleButton.hidden = Boolean(fileName);
+    uploadZone.classList.toggle('has-selected-file', Boolean(fileName));
   }
 
   fileInput.addEventListener('change', () => {

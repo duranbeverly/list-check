@@ -103,6 +103,7 @@ export function toMembers(
     }
 
     const readValue = (column: string | null) => (column ? (original[column] ?? '').trim() : '');
+    const phoneValue = readValue(columns.phone);
 
     return [{
       row,
@@ -111,7 +112,8 @@ export function toMembers(
       email: readValue(columns.email),
       optOut: readValue(columns.optOut),
       optOutMode: columns.optOutMode,
-      phone: columns.phone ? cleanPhone(readValue(columns.phone)) : null,
+      phoneValue,
+      phone: columns.phone ? cleanPhone(phoneValue) : null,
       hasExtraValues: rowsWithExtraValues.has(index),
       original,
     }];

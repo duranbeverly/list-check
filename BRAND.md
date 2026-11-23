@@ -1,4 +1,4 @@
-# list-check brand system
+# List Check brand system
 
 ## Purpose and voice
 
@@ -37,6 +37,6 @@ Transitions are 150ms ease for color, background, and border only, inside `prefe
 
 Use Lucide inline SVGs only: 2px strokes at 20 or 24px, with decorative icons marked `aria-hidden="true"` and meaningful states paired with text. Lucide icons are MIT licensed; see [LICENSES/Lucide-MIT.txt](./LICENSES/Lucide-MIT.txt).
 
-The mark is a check in a rounded square beside the bold, lowercase `list-check` wordmark. Keep the mark at least 24px high with 8px clear space. Use the same mark in the favicon, touch icon, and social preview.
+The mark is a check in a rounded square beside the bold `List Check` wordmark. Keep the mark at least 24px high with 8px clear space. Use the same mark in the favicon, touch icon, and social preview.
 
 The link-preview image is `public/og-image.png`, sized 1200×630. Theme metadata repeats the light and dark brand colors for browser chrome.

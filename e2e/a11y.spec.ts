@@ -36,14 +36,8 @@ test('aligns the header, hero, trust line, and example result', async ({ page })
     'href',
     'https://github.com/duranbeverly/list-check',
   );
-  await expect(page.getByRole('link', { name: 'How it works' })).toHaveAttribute(
-    'href',
-    'https://github.com/duranbeverly/list-check#how-it-works',
-  );
-  await expect(page.getByRole('link', { name: 'Read how your data stays local' })).toHaveAttribute(
-    'href',
-    'https://github.com/duranbeverly/list-check#privacy',
-  );
+  await expect(page.locator('.how-it-works summary')).toHaveText('How it works');
+  await expect(page.locator('.site-footer a')).toHaveCount(1);
   const footerLinkHeights = await page.locator('.site-footer a').evaluateAll((links) =>
     links.map((link) => link.getBoundingClientRect().height),
   );
@@ -54,7 +48,7 @@ test('shows the sample report and review table', async ({ page }) => {
   await expect(page.locator('#results-card')).toBeHidden();
   await page.getByRole('button', { name: 'No file handy? Try a sample list' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Step 2 · Your results' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your results' })).toBeVisible();
   await expect(page.locator('#summary')).toHaveText(
     '5 ready, 8 to review, 3 opted out.',
   );
@@ -153,10 +147,7 @@ test('supports keyboard navigation with a visible focus outline', async ({ page 
 test('fits a phone-width screen at 200% zoom and supports dark mode', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const footerLinkPositions = await page.locator('.footer-links a').evaluateAll((links) =>
-    links.map((link) => link.getBoundingClientRect().y),
-  );
-  expect(footerLinkPositions[1]).toBeGreaterThan(footerLinkPositions[0]);
+  await expect(page.locator('.example-preview')).toBeHidden();
 
   await page.getByRole('button', { name: 'No file handy? Try a sample list' }).click();
   await expect(page.locator('#summary')).toHaveText(
@@ -192,6 +183,43 @@ test('fits a phone-width screen at 200% zoom and supports dark mode', async ({ p
     getComputedStyle(document.querySelector('.card')!).backgroundColor,
   ]);
   expect(pageBackground).not.toBe(cardBackground);
+});
+
+test('keeps the file picker above the fold on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const box = await page.locator('#upload-zone').boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(844);
+});
+
+test('mutes zero-count tiles and keeps Check another in one place', async ({ page }) => {
+  await page.locator('#file-input').setInputFiles({
+    name: 'ready.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('first_name,email,opt_out\nAna,ana@example.com,No'),
+  });
+  await expect(page.locator('#ready-tile')).not.toHaveClass(/stat-tile--empty/);
+  await expect(page.locator('#review-tile')).toHaveClass(/stat-tile--empty/);
+  await expect(page.locator('#opted-out-tile')).toHaveClass(/stat-tile--empty/);
+  expect(await page.locator('#check-another').evaluate((link) => link.parentElement?.id))
+    .toBe('results-card');
+  expect(await page.locator('#check-another').evaluate((link) =>
+    Boolean(link.closest('.download-actions')),
+  )).toBe(false);
+  expect(await page.locator('.stat-number').first().evaluate((element) =>
+    getComputedStyle(element).fontFamily,
+  )).toContain('system-ui');
+});
+
+test('shows local how-it-works help and a visible review value', async ({ page }) => {
+  await page.locator('#file-input').setInputFiles({
+    name: 'short-phone.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('first_name,email,phone,opt_out\nAna,ana@example.com,703-555-01,No'),
+  });
+  await expect(page.locator('#review-table-body td[data-label="Value"]')).toHaveText('703-555-01');
+  await page.locator('.how-it-works summary').click();
+  await expect(page.locator('.how-it-works p')).toHaveCount(3);
 });
 
 test('has no axe accessibility violations on Step 1', async ({ page }) => {

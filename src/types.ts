@@ -38,6 +38,7 @@ export interface Member {
   email: string;
   optOut: string;
   optOutMode: OptOutMode;
+  phoneValue: string;
   phone: PhoneResult | null;
   hasExtraValues: boolean;
   original: RawRow;

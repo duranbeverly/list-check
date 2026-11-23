@@ -12,7 +12,7 @@
     <meta name="theme-color" content="#142022" media="(prefers-color-scheme: dark)" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://duranbeverly.github.io/list-check/" />
-    <meta property="og:title" content="list-check · Make a member list safe to text" />
+    <meta property="og:title" content="List Check · Make a member list safe to text" />
     <meta
       property="og:description"
       content="Clean phone numbers, review duplicates, and keep opt-outs out before texting."
@@ -24,7 +24,7 @@
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <title>list-check · Make a member list safe to text</title>
+    <title>List Check · Make a member list safe to text</title>
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%apple-touch-icon.png" />
   </head>
@@ -32,18 +32,18 @@
     <main id="app">
       <!-- Keep the app name visible in both steps. -->
       <header class="site-header">
-        <a id="wordmark" class="wordmark" href="%BASE_URL%" aria-label="list-check home">
+        <a id="wordmark" class="wordmark" href="%BASE_URL%" aria-label="List Check home">
           <svg class="brand-mark" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="1" y="1" width="22" height="22" rx="5" fill="var(--color-brand)" />
             <path d="m20 6-11 11-5-5" fill="none" stroke="var(--color-surface)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
           </svg>
-          <span>list-check</span>
+          <span>List Check</span>
         </a>
       </header>
 
       <!-- Help visitors choose a list and understand what the tool does. -->
       <section id="choose-card" class="card" aria-labelledby="hero-title">
-        <p class="step-label">Step 1 · Choose your list</p>
+        <p class="step-label">Choose your list</p>
         <h1 id="hero-title" class="hero-title" tabindex="-1">Make a member list safe to text</h1>
         <p class="hero-subhead">Drop in a spreadsheet. Get back a clean list, the people to check, and everyone who opted out.</p>
         <ul class="benefits" aria-label="What List Check does">
@@ -74,7 +74,7 @@
           <span>Runs on your computer. Nothing is uploaded.</span>
         </p>
 
-        <section  id="example-preview" class="example-preview" aria-labelledby="example-result-title">
+        <section id="example-preview" class="example-preview" aria-labelledby="example-result-title">
           <h2 id="example-result-title" class="example-heading">Example result</h2>
           <div class="example-tiles">
             <div class="example-tile example-tile--ready">
@@ -106,20 +106,21 @@
 
         <div id="upload-zone" class="upload-zone">
           <!-- Keep the real file input keyboard and screen-reader accessible. -->
-          <input id="file-input" class="visually-hidden" type="file" accept=".csv,text/csv" aria-describedby="upload-hint">
+          <input id="file-input" class="visually-hidden" type="file" accept=".csv,text/csv" aria-label="Choose a CSV file">
           <label class="upload-content" for="file-input">
             <svg class="upload-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
               <path d="M14 2v4a2 2 0 0 0 2 2h4m-8 4v6m3-3-3-3-3 3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
             </svg>
-            <strong id="upload-prompt">Drop your CSV here</strong>
+            <strong id="upload-prompt">Drop a CSV here or</strong>
             <strong id="drop-instruction" hidden>Drop to check</strong>
-            <span>or choose a file</span>
             <span class="upload-action">Choose a file</span>
-            <span id="upload-hint" class="upload-hint">CSV files only.</span>
           </label>
-          <p id="selected-file" class="selected-file" hidden></p>
-          <button id="choose-different-file" class="link-button" type="button" hidden>Choose a different file</button>
+          <div id="selected-file" class="selected-file" hidden>
+            <span id="selected-file-name"></span>
+            <span aria-hidden="true"> · </span>
+            <button id="choose-different-file" class="link-button" type="button">Choose a different file</button>
+          </div>
           <p id="file-status" class="file-status" role="status" aria-live="polite" tabindex="-1" hidden>
             <svg id="file-status-icon" class="file-status-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" hidden>
               <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" />
@@ -136,36 +137,49 @@
       </section>
 
       <section id="opt-out-setup" class="card opt-out-setup" aria-labelledby="opt-out-setup-title" hidden>
-        <h2 id="opt-out-setup-title">Opt-out check needed</h2>
+        <h2 id="opt-out-setup-title">Confirm opt-out handling</h2>
         <p id="opt-out-warning" role="alert"></p>
-        <label for="opt-out-column">Opt-out column</label>
-        <select id="opt-out-column">
-          <option value="">Choose a column</option>
-        </select>
-        <div id="opt-out-mode-controls" class="opt-out-mode-controls" hidden>
-          <label for="opt-out-mode">How does this column work?</label>
-          <select id="opt-out-mode">
-            <option value="flag">A flag: yes means opted out</option>
-            <option value="status">A status: subscribed or unsubscribed</option>
-          </select>
-        </div>
-        <label class="opt-out-confirm-label" for="confirm-no-opt-outs-check">
-          <input id="confirm-no-opt-outs-check" type="checkbox">
-          I checked: this list has no opt-out information.
-        </label>
-        <div class="opt-out-actions">
-          <button id="use-opt-out-column" class="button-primary" type="button" disabled>
-            Use this column
-          </button>
-          <button id="confirm-no-opt-outs" class="button-secondary" type="button" disabled>
-            This list has no opt-outs
-          </button>
-        </div>
+        <fieldset class="opt-out-options">
+          <legend>Choose one option</legend>
+          <label class="opt-out-choice" for="has-opt-out-column">
+            <input id="has-opt-out-column" name="opt-out-choice" type="radio" value="column">
+            My list has an opt-out column
+          </label>
+          <div id="opt-out-column-controls" class="opt-out-path" hidden>
+            <label for="opt-out-column">Choose the opt-out column</label>
+            <select id="opt-out-column">
+              <option value="">Choose a column</option>
+            </select>
+            <div id="opt-out-mode-controls" class="opt-out-mode-controls" hidden>
+              <label for="opt-out-mode">How does this column work?</label>
+              <select id="opt-out-mode">
+                <option value="flag">A flag: yes means opted out</option>
+                <option value="status">A status: subscribed or unsubscribed</option>
+              </select>
+            </div>
+            <button id="use-opt-out-column" class="button-primary" type="button" disabled>
+              Use this column
+            </button>
+          </div>
+          <label class="opt-out-choice" for="has-no-opt-out-column">
+            <input id="has-no-opt-out-column" name="opt-out-choice" type="radio" value="none">
+            My list has no opt-out information
+          </label>
+          <div id="confirm-no-opt-outs-controls" class="opt-out-path" hidden>
+            <label class="opt-out-confirm-label" for="confirm-no-opt-outs-check">
+              <input id="confirm-no-opt-outs-check" type="checkbox">
+              I checked: this list has no opt-out information.
+            </label>
+            <button id="confirm-no-opt-outs" class="button-secondary" type="button" disabled>
+              This list has no opt-outs
+            </button>
+          </div>
+        </fieldset>
       </section>
 
       <!-- Show the report only after a list has been checked. -->
       <section id="results-card" class="card" aria-labelledby="results-title" hidden>
-        <h1 id="results-title" class="results-title" tabindex="-1">Step 2 · Your results</h1>
+        <h1 id="results-title" class="results-title" tabindex="-1">Your results</h1>
         <p id="checked-file-name" class="checked-file-name"></p>
         <p id="opt-out-note" class="opt-out-note">
           <span id="opt-out-note-text"></span>
@@ -213,8 +227,8 @@
           <button type="button" id="download-ready" class="button-primary" hidden></button>
           <button type="button" id="download-review" class="button-secondary" hidden></button>
           <button type="button" id="download-opted-out" class="button-secondary" hidden></button>
-          <a id="check-another" class="link-button" href="#upload-zone">Check another file</a>
         </div>
+        <a id="check-another" class="link-button" href="#upload-zone">Check another file</a>
 
         <!-- Compare review reasons in a table that also stacks on small screens. -->
         <section class="review-section" aria-labelledby="review-heading">
@@ -227,6 +241,7 @@
                 <tr>
                   <th scope="col">Row</th>
                   <th scope="col">Name</th>
+                  <th scope="col">Value</th>
                   <th scope="col">What to check</th>
                 </tr>
               </thead>
@@ -236,6 +251,12 @@
         </section>
 
       </section>
+      <details class="how-it-works">
+        <summary>How it works</summary>
+        <p>Choose a CSV and List Check reads it in your browser.</p>
+        <p>It checks contact details and opt-out choices without uploading your file.</p>
+        <p>Then it lets you download separate CSVs for ready people, people to review, and people who opted out.</p>
+      </details>
     </main>
     <p id="step-announcement" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
     <footer class="site-footer">
@@ -243,12 +264,7 @@
         <span>Built by Beverly Duran</span>
         <span class="footer-separator" aria-hidden="true">·</span>
         <a href="https://github.com/duranbeverly/list-check">View the code on GitHub</a>
-        <span class="footer-separator" aria-hidden="true">·</span>
-        <a href="https://github.com/duranbeverly/list-check#how-it-works">How it works</a>
       </nav>
-      <p class="footer-privacy">
-        Privacy: <a href="https://github.com/duranbeverly/list-check#privacy">Read how your data stays local</a>.
-      </p>
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

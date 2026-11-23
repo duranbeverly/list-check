@@ -73,6 +73,9 @@ test('explains multiple phone numbers in one cell', async ({ page }) => {
   await expect(page.locator('#review-table-body')).toContainText(
     'Two numbers in one cell. Keep one.',
   );
+  await expect(page.locator('#review-table-body td[data-label="Value"]')).toHaveText(
+    '703-200-0027 / 703-200-0028',
+  );
 });
 
 test('normalizes mixed line endings before checking a list', async ({ page }) => {
@@ -199,11 +202,13 @@ test('shows a friendly message when phone and email columns are missing', async 
   });
 
   await expect(page.locator('#file-status')).toHaveText(
-    'No phone or email column found. Add one, then try again.',
+    'No phone or email column found. Columns in this file: first_name, last_name.',
   );
   await expect(page.locator('#file-status')).toBeFocused();
   await expect(page.locator('#file-status-icon')).toBeVisible();
-  await expect(page.locator('#selected-file')).toHaveText('Selected file: missing-contact.csv');
+  await expect(page.locator('#selected-file')).toHaveText(
+    'missing-contact.csv · Choose a different file',
+  );
   await expect(page.getByRole('button', { name: 'Choose a different file' })).toBeVisible();
   await expect(page.locator('#results-card')).toBeHidden();
 });
@@ -238,6 +243,7 @@ test('accepts a two-column CSV ending in a newline and confirms opt-out handling
 
   await expect(page.locator('#file-status')).toBeHidden();
   await expect(page.locator('#opt-out-setup')).toBeVisible();
+  await page.getByRole('radio', { name: 'My list has no opt-out information' }).check();
   await page.getByRole('checkbox', {
     name: 'I checked: this list has no opt-out information.',
   }).check();
@@ -298,7 +304,7 @@ test('clears stale results on errors and replaces errors after a valid check', a
   await expect(page.locator('#download-review')).toBeHidden();
   await expect(page.locator('#download-opted-out')).toBeHidden();
   await expect(page.locator('#file-status')).toHaveText(
-    'No phone or email column found. Add one, then try again.',
+    'No phone or email column found. Columns in this file: first_name, last_name.',
   );
 
   await input.setInputFiles({

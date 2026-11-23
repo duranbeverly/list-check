@@ -19,6 +19,9 @@ export interface ResultsView {
 const readyCount = getRequiredElement('ready-count', HTMLSpanElement);
 const reviewCount = getRequiredElement('review-count', HTMLSpanElement);
 const optedOutCount = getRequiredElement('opted-out-count', HTMLSpanElement);
+const readyTile = getRequiredElement('ready-tile', HTMLElement);
+const reviewTile = getRequiredElement('review-tile', HTMLElement);
+const optedOutTile = getRequiredElement('opted-out-tile', HTMLElement);
 const checkedFileName = getRequiredElement('checked-file-name', HTMLParagraphElement);
 const summary = getRequiredElement('summary', HTMLParagraphElement);
 const optOutNote = getRequiredElement('opt-out-note-text', HTMLSpanElement);
@@ -76,11 +79,30 @@ function appendReviewRow(member: MemberBuckets['needsReview'][number]) {
   const nameCell = document.createElement('td');
   nameCell.dataset.label = 'Name';
   nameCell.textContent = `${member.firstName} ${member.lastName}`.trim() || 'Name not provided';
+  const valueCell = document.createElement('td');
+  valueCell.dataset.label = 'Value';
+  valueCell.textContent = getReviewValue(member);
   const reasonCell = document.createElement('td');
   reasonCell.dataset.label = 'What to check';
   reasonCell.textContent = member.reasons.map(formatReviewReason).join(' ');
-  row.append(rowCell, nameCell, reasonCell);
+  row.append(rowCell, nameCell, valueCell, reasonCell);
   reviewBody.append(row);
+}
+
+function getReviewValue(member: MemberBuckets['needsReview'][number]): string {
+  if (member.phone && !member.phone.ok) return member.phoneValue || '—';
+  if (member.reasons.some((reason) => (
+    reason.startsWith('Opt-out value') || reason.startsWith('Subscription status')
+  ))) {
+    return member.optOut || '—';
+  }
+  if (member.reasons.some((reason) => reason.startsWith('same email'))) {
+    return member.email || '—';
+  }
+  if (member.reasons.some((reason) => reason.includes('phone'))) {
+    return member.phoneValue || '—';
+  }
+  return member.phoneValue || member.email || member.optOut || '—';
 }
 
 function renderReviewTable(buckets: MemberBuckets) {
@@ -105,7 +127,7 @@ function renderReviewTable(buckets: MemberBuckets) {
   if (count > 10) {
     const row = document.createElement('tr');
     const cell = document.createElement('td');
-    cell.colSpan = 3;
+    cell.colSpan = 4;
     cell.textContent = `and ${count - 10} more in the download.`;
     row.append(cell);
     reviewBody.append(row);
@@ -133,6 +155,9 @@ export const resultsView: ResultsView = {
     readyCount.textContent = String(buckets.ready.length);
     reviewCount.textContent = String(buckets.needsReview.length);
     optedOutCount.textContent = String(buckets.optedOut.length);
+    readyTile.classList.toggle('stat-tile--empty', buckets.ready.length === 0);
+    reviewTile.classList.toggle('stat-tile--empty', buckets.needsReview.length === 0);
+    optedOutTile.classList.toggle('stat-tile--empty', buckets.optedOut.length === 0);
     checkedFileName.textContent = fileName;
     summary.textContent = `${buckets.ready.length} ready, ${buckets.needsReview.length} to review, ${buckets.optedOut.length} opted out.`;
     optOutNote.textContent = [mappingMessage, phoneNote, encodingNote].filter(Boolean).join(' ');

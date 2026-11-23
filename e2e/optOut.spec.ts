@@ -14,19 +14,26 @@ test('blocks a ready list until the organizer confirms opt-out handling', async 
 
   await expect(page.locator('#opt-out-setup')).toBeVisible();
   await expect(page.locator('#opt-out-warning')).toHaveText(
-    'We could not identify an opt-out column. Choose one below, or deliberately confirm that this list has no opt-out information.',
+    "We couldn't find an opt-out column. Which is true?",
   );
   await expect(page.locator('#example-preview')).toBeHidden();
-  await expect(page.locator('#opt-out-column')).toBeFocused();
+  await expect(page.locator('#has-opt-out-column')).toBeFocused();
+  await expect(page.locator('#opt-out-column-controls')).toBeHidden();
+  await expect(page.locator('#confirm-no-opt-outs-controls')).toBeHidden();
   await expect(page.locator('#results-card')).toBeHidden();
   await expect(page.locator('#download-ready')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'This list has no opt-outs' })).toBeDisabled();
+  await expect(page.locator('#confirm-no-opt-outs')).toBeDisabled();
 
+  await page.getByRole('radio', { name: 'My list has no opt-out information' }).check();
+  await expect(page.locator('#confirm-no-opt-outs-controls')).toBeVisible();
+  await expect(page.locator('#opt-out-column-controls')).toBeHidden();
+  const confirmButton = page.getByRole('button', { name: 'This list has no opt-outs' });
+  await expect(confirmButton).toHaveCSS('cursor', 'not-allowed');
   await page.getByRole('checkbox', {
     name: 'I checked: this list has no opt-out information.',
   }).check();
-  await expect(page.getByRole('button', { name: 'This list has no opt-outs' })).toBeEnabled();
-  await page.getByRole('button', { name: 'This list has no opt-outs' }).click();
+  await expect(confirmButton).toBeEnabled();
+  await confirmButton.click();
   await expect(page.locator('#opt-out-setup')).toBeHidden();
   await expect(page.locator('#opt-out-note-text')).toHaveText(
     'You confirmed this list has no opt-out column.',
@@ -47,6 +54,8 @@ test('requires a deliberate column choice for a low-confidence opt-out guess', a
   await expect(page.locator('#opt-out-warning')).toContainText(
     'Possible opt-out column: custom_opt_out_flag',
   );
+  await page.getByRole('radio', { name: 'My list has an opt-out column' }).check();
+  await expect(page.locator('#opt-out-column-controls')).toBeVisible();
   await expect(page.locator('#opt-out-column')).toHaveValue('');
   await expect(page.locator('#opt-out-mode-controls')).toBeHidden();
   await expect(page.locator('#use-opt-out-column')).toBeDisabled();
@@ -125,6 +134,19 @@ test('allows changing the opt-out column from the results', async ({ page }) => 
   await expect(page.locator('#results-card')).toBeHidden();
   await expect(page.locator('#opt-out-setup')).toBeVisible();
   await expect(page.locator('#opt-out-column')).toHaveValue('');
+});
+
+test('collapses the upload area to the selected file and replacement action', async ({ page }) => {
+  await page.locator('#file-input').setInputFiles({
+    name: 'members.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('first_name,email,opt_out\nAna,ana@example.com,No'),
+  });
+  await expect(page.locator('#selected-file')).toHaveText(
+    'members.csv · Choose a different file',
+  );
+  await expect(page.locator('.upload-content')).toBeHidden();
+  await expect(page.locator('#sample-button')).toBeHidden();
 });
 
 test('opts out everyone who shares a phone with someone who says STOP', async ({ page }) => {

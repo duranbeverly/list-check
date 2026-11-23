@@ -1,18 +1,18 @@
-# list-check
+# List Check
 
-[Try list-check](https://duranbeverly.github.io/list-check/)
+[Try List Check](https://duranbeverly.github.io/list-check/)
 
 A small tool for checking contact lists before texting.
 
 | Light mode | Dark mode |
 |---|---|
-| ![list-check in light mode](./e2e/visual.spec.ts-snapshots/step-one-light.png) | ![list-check in dark mode](./e2e/visual.spec.ts-snapshots/step-one-dark.png) |
+| ![List Check in light mode](./e2e/visual.spec.ts-snapshots/step-one-light.png) | ![List Check in dark mode](./e2e/visual.spec.ts-snapshots/step-one-dark.png) |
 
 ## What it does
 
-Choose a CSV or try the sample list. list-check checks phone numbers, duplicate contacts, and opt-outs in your browser, then lets you download separate CSVs for people who are ready, people to review, and people who opted out.
+Choose a CSV or try the sample list. List Check checks phone numbers, duplicate contacts, and opt-outs in your browser, then lets you download separate CSVs for people who are ready, people to review, and people who opted out.
 
-If an opt-out column isn't recognized, list-check pauses before showing results. Choose the right column or confirm that the list has no opt-outs. Unfamiliar opt-out values stay in the review list.
+If an opt-out column isn't recognized, List Check pauses before showing results. Choose the right column or confirm that the list has no opt-outs. Unfamiliar opt-out values stay in the review list.
 
 ## What it doesn't do
 
@@ -37,7 +37,7 @@ Checking a file and creating downloads happen in your browser. The app does not 
 
 ## Design and voice
 
-list-check is meant to feel calm, clear, and helpful. It talks about people, not records, and explains what to do next without blaming anyone.
+List Check is meant to feel calm, clear, and helpful. It talks about people, not records, and explains what to do next without blaming anyone.
 
 The interface uses a contrast-checked palette, Atkinson Hyperlegible type, and accessibility patterns inspired by GOV.UK—including clear focus handling when a new step appears. See [BRAND.md](./BRAND.md) for the full palette, type, icons, spacing, shape, and motion rules.
 

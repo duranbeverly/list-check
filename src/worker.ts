@@ -227,7 +227,10 @@ function parseCsvText(text: string): NormalizedCsv | string {
 function createParsedList(file: File, encodingNote: string, parsed: NormalizedCsv, id: number) {
   const columns = guessColumns(parsed.headers);
   if (!columns.phone && !columns.email) {
-    sendError(id, 'No phone or email column found. Add one, then try again.');
+    sendError(
+      id,
+      `No phone or email column found. Columns in this file: ${parsed.headers.join(', ')}.`,
+    );
     return;
   }
 

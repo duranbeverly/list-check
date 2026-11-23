@@ -19,6 +19,10 @@ export interface OptOutPanel {
 export function connectOptOutPanel(actions: OptOutPanelActions): OptOutPanel {
   const panel = getRequiredElement('opt-out-setup', HTMLElement);
   const warning = getRequiredElement('opt-out-warning', HTMLParagraphElement);
+  const hasColumnChoice = getRequiredElement('has-opt-out-column', HTMLInputElement);
+  const noColumnChoice = getRequiredElement('has-no-opt-out-column', HTMLInputElement);
+  const columnPath = getRequiredElement('opt-out-column-controls', HTMLDivElement);
+  const noColumnPath = getRequiredElement('confirm-no-opt-outs-controls', HTMLDivElement);
   const column = getRequiredElement('opt-out-column', HTMLSelectElement);
   const modeControls = getRequiredElement('opt-out-mode-controls', HTMLDivElement);
   const mode = getRequiredElement('opt-out-mode', HTMLSelectElement);
@@ -27,18 +31,25 @@ export function connectOptOutPanel(actions: OptOutPanelActions): OptOutPanel {
   const confirmNone = getRequiredElement('confirm-no-opt-outs', HTMLButtonElement);
   const change = getRequiredElement('change-opt-out', HTMLButtonElement);
 
+  function updateChoiceControls() {
+    const usingColumn = hasColumnChoice.checked;
+    const confirmingNone = noColumnChoice.checked;
+    columnPath.hidden = !usingColumn;
+    noColumnPath.hidden = !confirmingNone;
+    useColumn.disabled = !usingColumn || !column.value;
+    confirmNone.disabled = !confirmingNone || !confirmCheck.checked;
+  }
+
+  hasColumnChoice.addEventListener('change', updateChoiceControls);
+  noColumnChoice.addEventListener('change', updateChoiceControls);
   column.addEventListener('change', () => {
     const selected = column.value !== '';
     modeControls.hidden = !selected;
-    useColumn.disabled = !selected;
     if (selected) mode.value = inferOptOutMode(column.value);
+    updateChoiceControls();
   });
-  mode.addEventListener('change', () => {
-    useColumn.disabled = !column.value;
-  });
-  confirmCheck.addEventListener('change', () => {
-    confirmNone.disabled = !confirmCheck.checked;
-  });
+  mode.addEventListener('change', updateChoiceControls);
+  confirmCheck.addEventListener('change', updateChoiceControls);
   useColumn.addEventListener('click', () => {
     if (column.value && (mode.value === 'flag' || mode.value === 'status')) {
       actions.useColumn(column.value, mode.value);
@@ -52,12 +63,13 @@ export function connectOptOutPanel(actions: OptOutPanelActions): OptOutPanel {
   function clear() {
     panel.hidden = true;
     warning.textContent = '';
+    hasColumnChoice.checked = false;
+    noColumnChoice.checked = false;
     column.replaceChildren(new Option('Choose a column', ''));
     mode.value = 'flag';
     modeControls.hidden = true;
-    useColumn.disabled = true;
     confirmCheck.checked = false;
-    confirmNone.disabled = true;
+    updateChoiceControls();
     change.hidden = true;
   }
 
@@ -66,16 +78,17 @@ export function connectOptOutPanel(actions: OptOutPanelActions): OptOutPanel {
       column.replaceChildren(new Option('Choose a column', ''));
       for (const header of headers) column.add(new Option(header, header));
       column.value = '';
+      hasColumnChoice.checked = false;
+      noColumnChoice.checked = false;
       mode.value = 'flag';
       modeControls.hidden = true;
-      useColumn.disabled = true;
       confirmCheck.checked = false;
-      confirmNone.disabled = true;
+      updateChoiceControls();
       warning.textContent = columns.optOut
-        ? `Possible opt-out column: ${columns.optOut}. Choose it below if it records opt-outs.`
-        : 'We could not identify an opt-out column. Choose one below, or deliberately confirm that this list has no opt-out information.';
+        ? `Possible opt-out column: ${columns.optOut}.`
+        : "We couldn't find an opt-out column. Which is true?";
       panel.hidden = false;
-      column.focus();
+      hasColumnChoice.focus();
     },
     hide() {
       panel.hidden = true;
