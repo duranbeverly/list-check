@@ -81,7 +81,12 @@ export function findFatalParseError(
   errors: ReadonlyArray<{ code: string; row?: number }>,
   rows: RawRow[],
 ): { code: string; row?: number } | null {
+  const hasData = rows.some((row) => !isBlankRow(row));
   return errors.find((error) => {
+    if (error.code === 'UndetectableDelimiter' && !hasData) {
+      return false;
+    }
+
     const row = error.row === undefined ? undefined : rows[error.row];
     return !(error.code === 'TooFewFields' && row !== undefined && isBlankRow(row));
   }) ?? null;

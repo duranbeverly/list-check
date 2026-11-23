@@ -6,7 +6,7 @@ import { checkList, findDuplicates, findFatalParseError, toCsv, toMembers } from
 import type { MemberBuckets } from './types';
 import './style.css';
 
-function getRequiredElement<T extends HTMLElement>(
+function getRequiredElement<T extends Element>(
   id: string,
   elementType: { new (): T },
 ): T {
@@ -18,11 +18,16 @@ function getRequiredElement<T extends HTMLElement>(
 }
 
 const fileInput = getRequiredElement('file-input', HTMLInputElement);
-const uploadZone = getRequiredElement('upload-zone', HTMLLabelElement);
+const uploadZone = getRequiredElement('upload-zone', HTMLDivElement);
+const uploadPrompt = getRequiredElement('upload-prompt', HTMLElement);
+const dropInstruction = getRequiredElement('drop-instruction', HTMLElement);
 const chooseCard = getRequiredElement('choose-card', HTMLElement);
 const resultsCard = getRequiredElement('results-card', HTMLElement);
 const sampleButton = getRequiredElement('sample-button', HTMLButtonElement);
 const fileStatus = getRequiredElement('file-status', HTMLParagraphElement);
+const fileStatusIcon = getRequiredElement('file-status-icon', SVGSVGElement);
+const loadingSpinner = getRequiredElement('loading-spinner', SVGSVGElement);
+const fileStatusMessage = getRequiredElement('file-status-message', HTMLSpanElement);
 const selectedFile = getRequiredElement('selected-file', HTMLParagraphElement);
 const chooseDifferentFile = getRequiredElement('choose-different-file', HTMLButtonElement);
 const checkedFileName = getRequiredElement('checked-file-name', HTMLParagraphElement);
@@ -39,12 +44,29 @@ const reviewEmpty = getRequiredElement('review-empty', HTMLParagraphElement);
 const downloadReadyButton = getRequiredElement('download-ready', HTMLButtonElement);
 const downloadReviewButton = getRequiredElement('download-review', HTMLButtonElement);
 const downloadOptedOutButton = getRequiredElement('download-opted-out', HTMLButtonElement);
-const checkAnotherButton = getRequiredElement('check-another', HTMLButtonElement);
+const checkAnotherButton = getRequiredElement('check-another', HTMLAnchorElement);
 
 let runCounter = 0;
 let currentBuckets: MemberBuckets | null = null;
 let currentFileName = '';
 let currentHeaders: string[] = [];
+
+function setFileStatus(message: string, state?: 'error' | 'loading') {
+  fileStatusMessage.textContent = message;
+  fileStatus.hidden = message.length === 0;
+  fileStatus.classList.toggle('file-status--error', state === 'error');
+  fileStatus.classList.toggle('file-status--loading', state === 'loading');
+  setSvgHidden(fileStatusIcon, state !== 'error');
+  setSvgHidden(loadingSpinner, state !== 'loading');
+}
+
+function setSvgHidden(element: SVGSVGElement, hidden: boolean) {
+  if (hidden) {
+    element.setAttribute('hidden', '');
+  } else {
+    element.removeAttribute('hidden');
+  }
+}
 
 function clearResults() {
   currentBuckets = null;
@@ -100,7 +122,7 @@ function renderReviewTable(buckets: MemberBuckets) {
         'opted-out',
       );
     } else {
-      setReviewEmptyMessage('No people were found in this list.');
+      setReviewEmptyMessage('No people found. Check the first row has column names.');
     }
     return;
   }
@@ -206,9 +228,9 @@ function renderReport(fileName: string, buckets: MemberBuckets, headers: string[
   checkedFileName.textContent = fileName;
 
   if (ready === 0 && review === 0 && optedOut === 0) {
-    summary.textContent = 'No people were found in this list. Check the file and try again.';
+    summary.textContent = 'No people found. Check the first row has column names.';
   } else if (review === 0 && ready === 0 && optedOut > 0) {
-    summary.textContent = 'Everyone on this list has opted out. No one is ready to import.';
+    summary.textContent = 'Everyone opted out. No one is ready to import.';
   } else if (review === 0) {
     summary.textContent = 'Everyone looks ready to import.';
   } else if (ready === 0) {
@@ -226,9 +248,9 @@ function renderReport(fileName: string, buckets: MemberBuckets, headers: string[
   } else if (review > 0) {
     nextStep.textContent = `Check the ${review} ${review === 1 ? 'person' : 'people'} below before importing.`;
   } else if (optedOut > 0) {
-    nextStep.textContent = 'No one from this list can be imported.';
+    nextStep.textContent = 'Keep these people out of the import. Download the opt-outs to save a copy.';
   } else {
-    nextStep.textContent = 'Add people to your list and check the file again.';
+    nextStep.textContent = 'Add people below the column names, then check the file again.';
   }
 
   renderReviewTable(buckets);
@@ -247,8 +269,8 @@ function renderReport(fileName: string, buckets: MemberBuckets, headers: string[
 function showFileError(message: string) {
   clearResults();
   chooseCard.hidden = false;
-  fileStatus.textContent = message;
-  fileStatus.hidden = false;
+  setFileStatus(message, 'error');
+  fileStatus.focus();
 }
 
 function handleFile(file: File, existingRun?: number) {
@@ -258,8 +280,7 @@ function handleFile(file: File, existingRun?: number) {
   selectedFile.textContent = `Selected file: ${file.name}`;
   selectedFile.hidden = false;
   chooseDifferentFile.hidden = false;
-  fileStatus.textContent = `Reading ${file.name}…`;
-  fileStatus.hidden = false;
+  setFileStatus('Checking your list…', 'loading');
 
   Papa.parse<Record<string, string>>(file, {
     header: true,
@@ -270,7 +291,7 @@ function handleFile(file: File, existingRun?: number) {
 
       if (findFatalParseError(results.errors, results.data)) {
         showFileError(
-          'This CSV has rows that do not match its headers. Check the file and try again.',
+          'Some rows do not match the column names. Fix the rows, then try again.',
         );
         return;
       }
@@ -278,28 +299,30 @@ function handleFile(file: File, existingRun?: number) {
       const headers = results.meta.fields ?? [];
       const columns = guessColumns(headers);
       if (!columns.phone && !columns.email) {
-        showFileError('Could not find a phone or email column. Add one and try again.');
+        showFileError('No phone or email column found. Add one, then try again.');
         return;
       }
 
       const members = toMembers(results.data, columns);
       const duplicateGroups = findDuplicates(members);
       const buckets = checkList(members, duplicateGroups);
-      fileStatus.textContent = '';
-      fileStatus.hidden = true;
+      setFileStatus('');
       renderReport(file.name, buckets, headers);
     },
     error: () => {
       if (runId !== runCounter) return;
-      showFileError('Could not read this file. Check that it is a valid CSV and try again.');
+      showFileError('Could not read this file. Check that it is a CSV file, then try again.');
     },
   });
 }
 
 function processFile(file: File) {
+  selectedFile.textContent = `Selected file: ${file.name}`;
+  selectedFile.hidden = false;
+  chooseDifferentFile.hidden = false;
   if (!file.name.toLowerCase().endsWith('.csv')) {
     ++runCounter;
-    showFileError('Choose a CSV file to continue.');
+    showFileError('Choose a .csv file to continue.');
     fileInput.value = '';
     return;
   }
@@ -336,13 +359,12 @@ sampleButton.addEventListener('click', async () => {
   const runId = ++runCounter;
   clearResults();
   chooseCard.hidden = false;
-  fileStatus.textContent = 'Loading the sample list…';
-  fileStatus.hidden = false;
+  setFileStatus('Loading the sample list…', 'loading');
   try {
     const response = await fetch(`${import.meta.env.BASE_URL}sample-members.csv`);
     if (runId !== runCounter) return;
     if (!response.ok) {
-      showFileError('Could not load the sample list. Please choose a CSV file instead.');
+      showFileError('Could not load the sample. Choose a CSV file instead.');
       return;
     }
 
@@ -352,7 +374,7 @@ sampleButton.addEventListener('click', async () => {
     handleFile(sample, runId);
   } catch {
     if (runId === runCounter) {
-      showFileError('Could not load the sample list. Please choose a CSV file instead.');
+      showFileError('Could not load the sample. Choose a CSV file instead.');
     }
   }
 });
@@ -366,27 +388,47 @@ checkAnotherButton.addEventListener('click', (event) => {
   ++runCounter;
   clearResults();
   chooseCard.hidden = false;
-  fileStatus.textContent = '';
-  fileStatus.hidden = true;
+  setFileStatus('');
   selectedFile.textContent = '';
   selectedFile.hidden = true;
   chooseDifferentFile.hidden = true;
   fileInput.value = '';
-  fileInput.focus();
+  const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 'auto'
+    : 'smooth';
+  uploadZone.scrollIntoView({ behavior, block: 'center' });
+  fileInput.focus({ preventScroll: true });
+});
+
+let dragDepth = 0;
+
+function setDragState(active: boolean) {
+  uploadZone.classList.toggle('is-drag-over', active);
+  uploadPrompt.hidden = active;
+  dropInstruction.hidden = !active;
+}
+
+uploadZone.addEventListener('dragenter', (event) => {
+  event.preventDefault();
+  dragDepth += 1;
+  setDragState(true);
 });
 
 uploadZone.addEventListener('dragover', (event) => {
   event.preventDefault();
-  uploadZone.classList.add('is-drag-over');
+  setDragState(true);
 });
 
-uploadZone.addEventListener('dragleave', () => {
-  uploadZone.classList.remove('is-drag-over');
+uploadZone.addEventListener('dragleave', (event) => {
+  event.preventDefault();
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) setDragState(false);
 });
 
 uploadZone.addEventListener('drop', (event) => {
   event.preventDefault();
-  uploadZone.classList.remove('is-drag-over');
+  dragDepth = 0;
+  setDragState(false);
   const file = event.dataTransfer?.files[0];
   if (file) processFile(file);
 });

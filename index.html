@@ -45,7 +45,6 @@
         <p class="step-label">Step 1 · Choose your list</p>
         <h1 id="hero-title" class="hero-title">Make a member list safe to text</h1>
         <p class="hero-subhead">Drop in a spreadsheet. Get back a clean list, the people to check, and everyone who opted out.</p>
-        <p id="privacy-note" class="privacy-note">Runs on your computer. Nothing is uploaded.</p>
         <ul class="benefits" aria-label="What List Check does">
           <li>
             <svg class="benefit-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -66,29 +65,77 @@
             <span>Keeps opt-outs out</span>
           </li>
         </ul>
-
-        <!-- Keep the real file input keyboard and screen-reader accessible. -->
-        <input id="file-input" class="visually-hidden" type="file" accept=".csv" aria-describedby="upload-hint">
-        <label id="upload-zone" class="upload-zone" for="file-input">
-          <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
-            <path d="M14 2v4a2 2 0 0 0 2 2h4m-8 4v6m3-3-3-3-3 3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+        <p id="privacy-note" class="privacy-note">
+          <svg class="trust-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
           </svg>
-          <strong>Drop your CSV here</strong>
-          <span>or choose a file</span>
-          <span class="upload-action">Choose a file</span>
-          <span id="upload-hint" class="upload-hint">CSV files only.</span>
-        </label>
-        <p id="selected-file" class="selected-file" hidden></p>
-        <button id="choose-different-file" class="link-button" type="button" hidden>Choose a different file</button>
-        <p id="file-status" class="file-status" aria-live="polite"></p>
-        <button id="sample-button" class="link-button sample-link" type="button">Try it with a sample list</button>
+          <span>Runs on your computer. Nothing is uploaded.</span>
+        </p>
+
+        <section class="example-preview" aria-labelledby="example-result-title">
+          <h2 id="example-result-title" class="example-heading">Example result</h2>
+          <div class="example-tiles">
+            <div class="example-tile example-tile--ready">
+              <svg class="example-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="m20 6-11 11-5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+              </svg>
+              <span class="example-count">5</span>
+              <span>Ready</span>
+            </div>
+            <div class="example-tile example-tile--review">
+              <svg class="example-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m10.29 3.86-8.2 14.14A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.73-3l-8.2-14.14a2 2 0 0 0-3.42 0Z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
+                <path d="M12 9v4m0 4h.01" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+              </svg>
+              <span class="example-count">8</span>
+              <span>To review</span>
+            </div>
+            <div class="example-tile example-tile--opted-out">
+              <svg class="example-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+                <path d="m4.9 4.9 14.2 14.2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+              </svg>
+              <span class="example-count">3</span>
+              <span>Opted out</span>
+            </div>
+          </div>
+        </section>
+
+        <div id="upload-zone" class="upload-zone">
+          <!-- Keep the real file input keyboard and screen-reader accessible. -->
+          <input id="file-input" class="visually-hidden" type="file" accept=".csv" aria-describedby="upload-hint">
+          <label class="upload-content" for="file-input">
+            <svg class="upload-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
+              <path d="M14 2v4a2 2 0 0 0 2 2h4m-8 4v6m3-3-3-3-3 3" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" />
+            </svg>
+            <strong id="upload-prompt">Drop your CSV here</strong>
+            <strong id="drop-instruction" hidden>Drop to check</strong>
+            <span>or choose a file</span>
+            <span class="upload-action">Choose a file</span>
+            <span id="upload-hint" class="upload-hint">CSV files only.</span>
+          </label>
+          <p id="selected-file" class="selected-file" hidden></p>
+          <button id="choose-different-file" class="link-button" type="button" hidden>Choose a different file</button>
+          <p id="file-status" class="file-status" role="status" aria-live="polite" tabindex="-1" hidden>
+            <svg id="file-status-icon" class="file-status-icon" viewBox="0 0 24 24" aria-hidden="true" hidden>
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" />
+              <path d="M12 8v4m0 4h.01" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+            </svg>
+            <svg id="loading-spinner" class="loading-spinner" viewBox="0 0 24 24" aria-hidden="true" hidden>
+              <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48 2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48 2.83-2.83" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2" />
+            </svg>
+            <span id="file-status-message"></span>
+          </p>
+          <button id="sample-button" class="link-button sample-link" type="button">No file handy? Try a sample list</button>
+        </div>
       </section>
 
       <!-- Show the report only after a list has been checked. -->
       <section id="results-card" class="card" aria-labelledby="results-title" hidden>
-        <p class="step-label">Step 2 · Results</p>
-        <h1 id="results-title" class="results-title">Your list is checked</h1>
+        <h1 id="results-title" class="results-title">Step 2 · Your results</h1>
         <p id="checked-file-name" class="checked-file-name"></p>
         <p id="summary" class="report-headline" aria-live="polite"></p>
 
@@ -132,7 +179,7 @@
           <button type="button" id="download-ready" class="button-primary" hidden></button>
           <button type="button" id="download-review" class="button-secondary" hidden></button>
           <button type="button" id="download-opted-out" class="button-secondary" hidden></button>
-          <button type="button" id="check-another" class="link-button">Check another file</button>
+          <a id="check-another" class="link-button" href="#upload-zone">Check another file</a>
         </div>
 
         <!-- Compare review reasons in a table that also stacks on small screens. -->
@@ -157,7 +204,14 @@
       </section>
     </main>
     <footer class="site-footer">
-      <p>Built by Beverly Duran · <a href="https://github.com/duranbeverly/list-check">View the code on GitHub</a></p>
+      <p>
+        Built by Beverly Duran ·
+        <a href="https://github.com/duranbeverly/list-check">View the code on GitHub</a> ·
+        <a href="https://github.com/duranbeverly/list-check#how-it-works">How it works</a>
+      </p>
+      <p class="footer-privacy">
+        Privacy: <a href="https://github.com/duranbeverly/list-check#privacy">Read how your data stays local</a>.
+      </p>
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

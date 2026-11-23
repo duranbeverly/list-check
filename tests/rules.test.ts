@@ -77,6 +77,15 @@ describe('CSV parsing', () => {
 
     expect(findFatalParseError(results.errors, results.data)).toMatchObject({ code: 'TooFewFields' });
   });
+
+  it('accepts a header-only CSV with a trailing blank row', () => {
+    const results = Papa.parse<RawRow>(
+      'email,phone\n',
+      { header: true, skipEmptyLines: false },
+    );
+
+    expect(findFatalParseError(results.errors, results.data)).toBeNull();
+  });
 });
 
 describe('toMembers', () => {

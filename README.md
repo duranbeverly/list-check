@@ -10,6 +10,14 @@ Use plain, calm, reassuring language. Say “people,” not “records,” and a
 
 See [BRAND.md](./BRAND.md) for the shared palette, type, icon, spacing, shape, and motion rules.
 
+## How it works
+
+Choose a CSV or try the sample list. list-check checks phone numbers, duplicate contacts, and opt-outs in your browser, then lets you download separate CSVs for the ready people, people to review, and opt-outs.
+
+## Privacy
+
+Your selected CSV is read in your browser and is not uploaded. Downloads are created on your device. The sample list is a static file served by this site; the app does not send your contact list to a server.
+
 ## Decisions
 
 - Shared phone groups need human review rather than being marked ready. A text to a shared number can reach multiple people, so someone should confirm who will receive it before sending.
