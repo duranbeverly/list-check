@@ -1,3 +1,5 @@
+import type { ColumnMapping } from './types';
+
 // Keep preferred header names first so matches are predictable.
 const HEADER_ALIASES = {
   phone: ['phone', 'cell', 'cell phone', 'mobile', 'mobile phone', 'phone number', 'telephone', 'telephone number'],
@@ -6,9 +8,6 @@ const HEADER_ALIASES = {
   firstName: ['first_name', 'first name', 'first', 'given name'],
   lastName: ['last_name', 'last name', 'last', 'surname', 'family name'],
 } as const;
-
-type ColumnRole = keyof typeof HEADER_ALIASES;
-type GuessedColumns = Record<ColumnRole, string | null>;
 
 // Match cleaned names while keeping the original header for later use.
 function findHeader(headers: string[], aliases: readonly string[]): string | null {
@@ -23,7 +22,7 @@ function findHeader(headers: string[], aliases: readonly string[]): string | nul
 }
 
 // Return the matching header for each role, or null when none is found.
-export function guessColumns(headers: string[]): GuessedColumns {
+export function guessColumns(headers: string[]): ColumnMapping {
   return {
     phone: findHeader(headers, HEADER_ALIASES.phone),
     email: findHeader(headers, HEADER_ALIASES.email),

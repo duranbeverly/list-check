@@ -1,7 +1,9 @@
 // Load the CSV reader and page styles.
 import Papa from 'papaparse';
 import { guessColumns } from './columns';
+import { toMembers } from './rules';
 import './style.css';
+import type { RawRow } from './types';
 
 // Find the controls and result area.
 const fileInput = document.getElementById('file-input') as HTMLInputElement;
@@ -28,10 +30,10 @@ function handleFile(file: File) {
   // Let people know the file is being read.
   summaryParagraph.textContent = `Reading ${file.name}…`;
 
-  // Use the first row as column names and ignore blank lines.
-  Papa.parse(file, {
+  // Keep blank lines so each member keeps their true file row.
+  Papa.parse<RawRow>(file, {
     header: true,
-    skipEmptyLines: true,
+    skipEmptyLines: false,
     encoding: 'UTF-8',
 
     complete: (results) => {
@@ -49,7 +51,8 @@ function handleFile(file: File) {
         return;
       }
 
-      const count = results.data.length;
+      const members = toMembers(results.data, guessedColumns);
+      const count = members.length;
       const message = count === 0
         ? `No people found in ${file.name}.`
         : `${count} ${count === 1 ? 'person' : 'people'} found in ${file.name}.`;
