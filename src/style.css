@@ -474,7 +474,7 @@ a:focus-visible {
 
 .checked-file-name {
   color: var(--color-muted);
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-1);
   max-width: 65ch;
   overflow-wrap: anywhere;
 }
@@ -482,6 +482,10 @@ a:focus-visible {
 .opt-out-note {
   margin: 0 0 var(--space-2);
   overflow-wrap: anywhere;
+}
+
+.opt-out-note .link-button {
+  white-space: nowrap;
 }
 
 .stat-tiles {

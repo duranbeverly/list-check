@@ -22,6 +22,19 @@ If an opt-out column isn't recognized, list-check pauses before showing results.
 
 Your selected CSV is read in your browser. Downloads are created on your device. The sample list is a static file served by this site.
 
+## How it works
+
+```text
+CSV file → decode text → parse rows → map columns → check people
+         → ready / review / opted-out buckets → download CSVs
+```
+
+The browser reads and processes your list locally in a Web Worker, which keeps the page responsive during larger checks. Your file and results are not uploaded or sent to an account or service. The only network request involved in trying the sample is for the sample CSV hosted with this site.
+
+## Privacy
+
+Checking a file and creating downloads happen in your browser. The app does not send list contents to a server, and its Content Security Policy restricts connections to this site. You can verify this behavior with the privacy browser test.
+
 ## Design and voice
 
 list-check is meant to feel calm, clear, and helpful. It talks about people, not records, and explains what to do next without blaming anyone.
@@ -39,13 +52,15 @@ The interface uses a contrast-checked palette, Atkinson Hyperlegible type, and a
 
 ## Limits
 
-The app is tested with lists of up to 100,000 people. Larger files may take longer to check.
+Files are limited to 50 MB and 500,000 rows. The app is tested with lists of up to 100,000 people; split larger lists into smaller files.
 
 ## Testing
 
 - `npm test` runs the unit, property-based, CSV fixture, and golden-file tests.
-- `npm run test:e2e` builds the production site and runs Playwright in Chromium, Firefox, and WebKit. The browser tests cover privacy, downloads, keyboard use, and axe accessibility checks.
+- `npm run test:e2e` builds the production site and runs Playwright in Chromium, Firefox, and WebKit. The browser tests cover privacy, file formats, downloads, opt-out decisions, keyboard use, axe accessibility, and large-file responsiveness. Screenshot-based E2E tests are not part of the suite.
 - GitHub Actions runs the unit and browser tests for changes to `main` and pull requests.
+
+Design details, including the contrast-checked palette, Atkinson Hyperlegible type, and GOV.UK-inspired patterns, are in [BRAND.md](./BRAND.md).
 
 ## Run locally
 

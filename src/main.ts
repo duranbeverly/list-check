@@ -1,789 +1,126 @@
+// Connect upload, worker processing, and the focused UI modules.
 import '@fontsource/atkinson-hyperlegible/400.css';
 import '@fontsource/atkinson-hyperlegible/700.css';
-import Papa from 'papaparse';
-import { guessColumns, inferOptOutMode } from './columns';
-import { decodeCsvBytes } from './csv';
-import {
-  checkList,
-  findDuplicates,
-  findFatalParseError,
-  formatReviewReason,
-  toCsv,
-  toMembers,
-} from './rules';
-import type { ColumnMapping, MemberBuckets, RawRow } from './types';
 import './style.css';
+import { getFileError } from './fileValidation';
+import { connectProcessing } from './processing';
+import { connectNavigation } from './ui/navigation';
+import { connectOptOutPanel } from './ui/optOutPanel';
+import { connectReportController } from './ui/reportController';
+import { connectUpload } from './ui/upload';
+import type { WorkerRequest, WorkerResponse } from './workerProtocol';
 
-function getRequiredElement<T extends Element>(
-  id: string,
-  elementType: { new (): T },
-): T {
-  const element = document.getElementById(id);
-  if (!(element instanceof elementType)) {
-    throw new Error(`The page is missing the required #${id} control.`);
-  }
-  return element;
+let requestId = 0;
+
+const upload = connectUpload({
+  file: processFile,
+  sample: loadSample,
+  cancel: cancelCheck,
+});
+let reportController: ReturnType<typeof connectReportController>;
+const optOutPanel = connectOptOutPanel({
+  useColumn: (column, mode) => resolveOptOut({ column, mode }),
+  confirmNone: () => resolveOptOut({ column: null, mode: 'none' }),
+  change: () => reportController.changeOptOut(),
+});
+const navigation = connectNavigation(resetToStepOne);
+reportController = connectReportController({ upload, optOutPanel, navigation });
+const processing = connectProcessing({
+  progress(id) {
+    if (id !== requestId || !processing.isActive()) return;
+    upload.setStatus('Still checking your list…', 'loading');
+    upload.setCancelVisible(true);
+  },
+  response: handleWorkerResponse,
+  error(id, message) {
+    if (id === requestId) showFileError(message);
+  },
+});
+
+function stopWorker() {
+  processing.stop();
+  upload.setCancelVisible(false);
 }
 
-const fileInput = getRequiredElement('file-input', HTMLInputElement);
-const wordmark = getRequiredElement('wordmark', HTMLAnchorElement);
-const stepOneHeading = getRequiredElement('hero-title', HTMLHeadingElement);
-const resultsHeading = getRequiredElement('results-title', HTMLHeadingElement);
-const stepAnnouncement = getRequiredElement('step-announcement', HTMLParagraphElement);
-const uploadZone = getRequiredElement('upload-zone', HTMLDivElement);
-const uploadPrompt = getRequiredElement('upload-prompt', HTMLElement);
-const dropInstruction = getRequiredElement('drop-instruction', HTMLElement);
-const chooseCard = getRequiredElement('choose-card', HTMLElement);
-const resultsCard = getRequiredElement('results-card', HTMLElement);
-const sampleButton = getRequiredElement('sample-button', HTMLButtonElement);
-const examplePreview = getRequiredElement('example-preview', HTMLElement);
-const fileStatus = getRequiredElement('file-status', HTMLParagraphElement);
-const fileStatusIcon = getRequiredElement('file-status-icon', SVGSVGElement);
-const loadingSpinner = getRequiredElement('loading-spinner', SVGSVGElement);
-const fileStatusMessage = getRequiredElement('file-status-message', HTMLSpanElement);
-const selectedFile = getRequiredElement('selected-file', HTMLParagraphElement);
-const chooseDifferentFile = getRequiredElement('choose-different-file', HTMLButtonElement);
-const checkedFileName = getRequiredElement('checked-file-name', HTMLParagraphElement);
-const summary = getRequiredElement('summary', HTMLParagraphElement);
-const optOutNoteText = getRequiredElement('opt-out-note-text', HTMLSpanElement);
-const changeOptOutButton = getRequiredElement('change-opt-out', HTMLButtonElement);
-const optOutSetup = getRequiredElement('opt-out-setup', HTMLElement);
-const optOutWarning = getRequiredElement('opt-out-warning', HTMLParagraphElement);
-const optOutColumnSelect = getRequiredElement('opt-out-column', HTMLSelectElement);
-const optOutModeControls = getRequiredElement('opt-out-mode-controls', HTMLDivElement);
-const optOutModeSelect = getRequiredElement('opt-out-mode', HTMLSelectElement);
-const useOptOutColumnButton = getRequiredElement('use-opt-out-column', HTMLButtonElement);
-const confirmNoOptOutsButton = getRequiredElement('confirm-no-opt-outs', HTMLButtonElement);
-const confirmNoOptOutsCheckbox = getRequiredElement('confirm-no-opt-outs-check', HTMLInputElement);
-const readyCount = getRequiredElement('ready-count', HTMLSpanElement);
-const reviewCount = getRequiredElement('review-count', HTMLSpanElement);
-const optedOutCount = getRequiredElement('opted-out-count', HTMLSpanElement);
-const nextStep = getRequiredElement('next-step', HTMLParagraphElement);
-const reviewTable = getRequiredElement('review-table', HTMLTableElement);
-const reviewHeading = getRequiredElement('review-heading', HTMLHeadingElement);
-const reviewTableCaption = getRequiredElement('review-caption', HTMLTableCaptionElement);
-const reviewTableBody = getRequiredElement('review-table-body', HTMLTableSectionElement);
-const reviewEmpty = getRequiredElement('review-empty', HTMLParagraphElement);
-const downloadReadyButton = getRequiredElement('download-ready', HTMLButtonElement);
-const downloadReviewButton = getRequiredElement('download-review', HTMLButtonElement);
-const downloadOptedOutButton = getRequiredElement('download-opted-out', HTMLButtonElement);
-const checkAnotherButton = getRequiredElement('check-another', HTMLAnchorElement);
-
-let runCounter = 0;
-let currentBuckets: MemberBuckets | null = null;
-let currentFileName = '';
-let currentHeaders: string[] = [];
-let currentParsedList: {
-  fileName: string;
-  rows: RawRow[];
-  headers: string[];
-  encodingNote: string;
-  rowsWithExtraValues: ReadonlySet<number>;
-} | null = null;
-let currentColumns: ColumnMapping | null = null;
-let resultsHistoryEntry = false;
-let pendingOptOutResolution: {
-  fileName: string;
-  rows: RawRow[];
-  headers: string[];
-  encodingNote: string;
-  rowsWithExtraValues: ReadonlySet<number>;
-} | null = null;
-
-interface ParsedCsvRow extends Record<string, string | string[] | undefined> {
-  __parsed_extra?: string[];
-}
-
-function setFileStatus(message: string, state?: 'error' | 'loading') {
-  fileStatusMessage.textContent = message;
-  fileStatus.hidden = message.length === 0;
-  fileStatus.classList.toggle('file-status--error', state === 'error');
-  fileStatus.classList.toggle('file-status--loading', state === 'loading');
-  setSvgHidden(fileStatusIcon, state !== 'error');
-  setSvgHidden(loadingSpinner, state !== 'loading');
-}
-
-function setSvgHidden(element: SVGSVGElement, hidden: boolean) {
-  if (hidden) {
-    element.setAttribute('hidden', '');
-  } else {
-    element.removeAttribute('hidden');
-  }
-}
-
-function clearResults() {
-  currentBuckets = null;
-  currentFileName = '';
-  currentHeaders = [];
-  currentParsedList = null;
-  currentColumns = null;
-  pendingOptOutResolution = null;
-  resultsCard.hidden = true;
-  optOutSetup.hidden = true;
-  optOutWarning.textContent = '';
-  optOutColumnSelect.replaceChildren(new Option('Choose a column', ''));
-  optOutModeSelect.value = 'flag';
-  optOutModeControls.hidden = true;
-  useOptOutColumnButton.disabled = true;
-  confirmNoOptOutsCheckbox.checked = false;
-  confirmNoOptOutsButton.disabled = true;
-  optOutNoteText.textContent = '';
-  changeOptOutButton.hidden = true;
-  reviewTableBody.replaceChildren();
-  reviewTable.hidden = true;
-  reviewEmpty.hidden = true;
-  downloadReadyButton.hidden = true;
-  downloadReviewButton.hidden = true;
-  downloadOptedOutButton.hidden = true;
-}
-
-function scrollToTop() {
-  const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ? 'auto'
-    : 'smooth';
-  window.scrollTo({ top: 0, behavior });
-}
-
-function showStepOne() {
-  ++runCounter;
-  clearResults();
-  chooseCard.hidden = false;
-  examplePreview.hidden = false;
-  resultsHistoryEntry = false;
-  setFileStatus('');
-  stepAnnouncement.textContent = 'Started over. Choose a file to check.';
-  selectedFile.textContent = '';
-  selectedFile.hidden = true;
-  chooseDifferentFile.hidden = true;
-  fileInput.value = '';
-  scrollToTop();
-  stepOneHeading.focus({ preventScroll: true });
-}
-
-function isModifiedClick(event: MouseEvent): boolean {
-  return event.button !== 0
-    || event.ctrlKey
-    || event.metaKey
-    || event.shiftKey
-    || event.altKey;
-}
-
-function renderReviewTable(buckets: MemberBuckets) {
-  reviewTableBody.replaceChildren();
-
-  if (buckets.needsReview.length === 0) {
-    reviewTable.hidden = true;
-    reviewHeading.hidden = true;
-    reviewEmpty.hidden = false;
-    if (buckets.ready.length > 0) {
-      setReviewEmptyMessage('Everyone looks ready.', 'ready');
-    } else if (buckets.optedOut.length > 0) {
-      setReviewEmptyMessage(
-        'Everyone on this list opted out. No one is ready to import.',
-        'opted-out',
-      );
-    } else {
-      setReviewEmptyMessage('We found the column names but no people yet.');
-    }
-    return;
-  }
-
-  reviewEmpty.hidden = true;
-  reviewHeading.hidden = false;
-  reviewTable.hidden = false;
-  const count = buckets.needsReview.length;
-  reviewTableCaption.textContent = `${count} ${count === 1 ? 'person' : 'people'} to check`;
-
-  buckets.needsReview.slice(0, 10).forEach((member) => {
-    const row = document.createElement('tr');
-    const rowCell = document.createElement('td');
-    rowCell.dataset.label = 'Row';
-    const rowBadge = document.createElement('span');
-    rowBadge.className = 'row-badge';
-    rowBadge.textContent = `Row ${member.row}`;
-    rowCell.append(rowBadge);
-
-    const nameCell = document.createElement('td');
-    nameCell.dataset.label = 'Name';
-    nameCell.textContent = `${member.firstName} ${member.lastName}`.trim() || 'Name not provided';
-
-    const reasonCell = document.createElement('td');
-    reasonCell.dataset.label = 'What to check';
-    reasonCell.textContent = member.reasons.map(formatReviewReason).join(' ');
-
-    row.append(rowCell, nameCell, reasonCell);
-    reviewTableBody.append(row);
-  });
-
-  if (count > 10) {
-    const moreRow = document.createElement('tr');
-    const moreCell = document.createElement('td');
-    moreCell.colSpan = 3;
-    moreCell.textContent = `and ${count - 10} more in the download.`;
-    moreRow.append(moreCell);
-    reviewTableBody.append(moreRow);
-  }
-}
-
-function setReviewEmptyMessage(
-  message: string,
-  state?: 'ready' | 'opted-out',
-) {
-  reviewEmpty.className = state ? `review-empty review-empty--${state}` : 'review-empty';
-  reviewEmpty.replaceChildren();
-
-  if (state) {
-    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    icon.setAttribute('class', 'review-empty-icon');
-    icon.setAttribute('width', '24');
-    icon.setAttribute('height', '24');
-    icon.setAttribute('viewBox', '0 0 24 24');
-    icon.setAttribute('aria-hidden', 'true');
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', '12');
-    circle.setAttribute('cy', '12');
-    circle.setAttribute('r', '9');
-    circle.setAttribute('fill', 'none');
-    circle.setAttribute('stroke', 'currentColor');
-    circle.setAttribute('stroke-width', '2');
-    icon.append(circle);
-
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute(
-      'd',
-      state === 'ready' ? 'm20 6-11 11-5-5' : 'm4.9 4.9 14.2 14.2',
-    );
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', 'currentColor');
-    path.setAttribute('stroke-linecap', 'round');
-    path.setAttribute('stroke-width', '2');
-    icon.append(path);
-    reviewEmpty.append(icon);
-  }
-
-  const text = document.createElement('span');
-  text.textContent = message;
-  reviewEmpty.append(text);
-}
-
-function setDownloadButton(
-  button: HTMLElement,
-  label: string,
-  bucketCount: number,
-  isPrimary: boolean,
-) {
-  button.hidden = bucketCount === 0;
-  button.textContent = `${label} (${bucketCount})`;
-  button.className = isPrimary ? 'button-primary' : 'button-secondary';
-}
-
-function renderReport(
-  fileName: string,
-  buckets: MemberBuckets,
-  headers: string[],
-  mappingMessage: string,
-) {
-  currentBuckets = buckets;
-  currentFileName = fileName;
-  currentHeaders = headers;
-  const ready = buckets.ready.length;
-  const review = buckets.needsReview.length;
-  const optedOut = buckets.optedOut.length;
-
-  readyCount.textContent = String(ready);
-  reviewCount.textContent = String(review);
-  optedOutCount.textContent = String(optedOut);
-  checkedFileName.textContent = fileName;
-  optOutNoteText.textContent = mappingMessage;
-  changeOptOutButton.hidden = !currentParsedList;
-
-  summary.textContent = `${ready} ready, ${review} to review, ${optedOut} opted out.`;
-
-  if (ready > 0 && review > 0) {
-    nextStep.textContent = `Import the ${ready} ready ${ready === 1 ? 'person' : 'people'} now. Check the ${review} below.`;
-  } else if (ready > 0) {
-    nextStep.textContent = `Import the ${ready} ready ${ready === 1 ? 'person' : 'people'} now.`;
-  } else if (review > 0) {
-    nextStep.textContent = `Check the ${review} ${review === 1 ? 'person' : 'people'} below before importing.`;
-  } else if (optedOut > 0) {
-    nextStep.textContent = 'Keep these people out of the import. Download the opt-outs to save a copy.';
-  } else {
-    nextStep.textContent = 'Add people below the column names, then check the file again.';
-  }
-
-  renderReviewTable(buckets);
-
-  const readyIsPrimary = ready > 0;
-  const reviewIsPrimary = ready === 0 && review > 0;
-  const optedOutIsPrimary = ready === 0 && review === 0 && optedOut > 0;
-  setDownloadButton(downloadReadyButton, 'Download ready list', ready, readyIsPrimary);
-  setDownloadButton(downloadReviewButton, 'Download to review', review, reviewIsPrimary);
-  setDownloadButton(downloadOptedOutButton, 'Download opt-outs', optedOut, optedOutIsPrimary);
-
-  chooseCard.hidden = true;
-  resultsCard.hidden = false;
-  if (!resultsHistoryEntry) {
-    window.history.pushState({ listCheckStep: 'results' }, '', window.location.href);
-    resultsHistoryEntry = true;
-  }
-  resultsHeading.focus({ preventScroll: true });
-  resultsHeading.scrollIntoView({
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-    block: 'start',
-  });
-}
-
-function renderParsedList(
-  fileName: string,
-  rows: RawRow[],
-  headers: string[],
-  columns: ColumnMapping,
-  mappingMessage: string,
-  encodingNote: string,
-  rowsWithExtraValues: ReadonlySet<number> = new Set(),
-) {
-  currentParsedList = { fileName, rows, headers, encodingNote, rowsWithExtraValues };
-  currentColumns = columns;
-  const members = toMembers(rows, columns, rowsWithExtraValues);
-  const duplicateGroups = findDuplicates(members);
-  const buckets = checkList(members, duplicateGroups);
-  setFileStatus('');
-  const notes = [
-    mappingMessage,
-    columns.phone ? '' : 'No phone column, so we checked emails only.',
-    encodingNote,
-  ].filter(Boolean);
-  renderReport(fileName, buckets, headers, notes.join(' '));
-}
-
-function requestOptOutResolution(
-  fileName: string,
-  rows: RawRow[],
-  headers: string[],
-  columns: ColumnMapping,
-  encodingNote: string,
-  rowsWithExtraValues: ReadonlySet<number> = new Set(),
-) {
-  pendingOptOutResolution = { fileName, rows, headers, encodingNote, rowsWithExtraValues };
-  optOutColumnSelect.replaceChildren(new Option('Choose a column', ''));
-  for (const header of headers) {
-    const option = document.createElement('option');
-    option.value = header;
-    option.textContent = header;
-    optOutColumnSelect.append(option);
-  }
-  optOutColumnSelect.value = '';
-  optOutModeSelect.value = 'flag';
-  optOutModeControls.hidden = true;
-  useOptOutColumnButton.disabled = true;
-  optOutWarning.textContent = columns.optOut
-    ? `Possible opt-out column: ${columns.optOut}. Choose it below if it records opt-outs.`
-    : 'We could not identify an opt-out column. Choose one below, or deliberately confirm that this list has no opt-out information.';
-  confirmNoOptOutsCheckbox.checked = false;
-  confirmNoOptOutsButton.disabled = true;
-  optOutSetup.hidden = false;
-  setFileStatus('');
-  optOutColumnSelect.focus();
-}
-
-function useSelectedOptOutColumn() {
-  const pending = pendingOptOutResolution;
-  const selectedColumn = optOutColumnSelect.value;
-  const mode = optOutModeSelect.value;
-  if (!pending || !selectedColumn) return;
-  if (mode !== 'flag' && mode !== 'status') {
-    throw new Error('Choose how the opt-out column is interpreted.');
-  }
-
-  const guessedColumns = guessColumns(pending.headers);
-  const columns: ColumnMapping = {
-    ...guessedColumns,
-    optOut: selectedColumn,
-    optOutMode: mode,
-    optOutConfidence: 'confirmed',
-  };
-  const mappingMessage = `Using the ${selectedColumn} column for opt-outs.`;
-  pendingOptOutResolution = null;
-  optOutSetup.hidden = true;
-  renderParsedList(
-    pending.fileName,
-    pending.rows,
-    pending.headers,
-    columns,
-    mappingMessage,
-    pending.encodingNote,
-    pending.rowsWithExtraValues,
-  );
-}
-
-function confirmNoOptOutColumn() {
-  const pending = pendingOptOutResolution;
-  if (!pending || !confirmNoOptOutsCheckbox.checked) return;
-
-  const columns: ColumnMapping = {
-    ...guessColumns(pending.headers),
-    optOut: null,
-    optOutMode: 'none',
-    optOutConfidence: 'confirmed',
-  };
-  pendingOptOutResolution = null;
-  optOutSetup.hidden = true;
-  renderParsedList(
-    pending.fileName,
-    pending.rows,
-    pending.headers,
-    columns,
-    'You confirmed this list has no opt-out column.',
-    pending.encodingNote,
-    pending.rowsWithExtraValues,
-  );
-}
-
-function getUniqueExtraHeaders(headers: string[], count: number): string[] {
-  const used = new Set(headers.map((header) => header.trim().toLowerCase()));
-  const extraHeaders: string[] = [];
-
-  for (let index = 0; index < count; index += 1) {
-    const base = `Extra value ${index + 1}`;
-    let candidate = base;
-    let suffix = 2;
-    while (used.has(candidate.toLowerCase())) {
-      candidate = `${base} (${suffix})`;
-      suffix += 1;
-    }
-    used.add(candidate.toLowerCase());
-    extraHeaders.push(candidate);
-  }
-
-  return extraHeaders;
-}
-
-function normalizeParsedRows(
-  data: ParsedCsvRow[],
-  headers: string[],
-): { rows: RawRow[]; headers: string[]; rowsWithExtraValues: ReadonlySet<number> } {
-  const extraValues = data.map((row) => row.__parsed_extra ?? []);
-  const maxExtraValues = Math.max(0, ...extraValues.map((values) => values.length));
-  const extraHeaders = getUniqueExtraHeaders(headers, maxExtraValues);
-  const rows = data.map((row, rowIndex) => {
-    const normalized: RawRow = {};
-    for (const header of headers) {
-      const value = row[header];
-      normalized[header] = typeof value === 'string' ? value : '';
-    }
-    extraHeaders.forEach((header, index) => {
-      normalized[header] = extraValues[rowIndex][index] ?? '';
-    });
-    return normalized;
-  });
-  const rowsWithExtraValues = new Set(
-    extraValues.flatMap((values, index) => values.length > 0 ? [index] : []),
-  );
-
-  return {
-    rows,
-    headers: [...headers, ...extraHeaders],
-    rowsWithExtraValues,
-  };
-}
-
-function isExcelFileName(fileName: string): boolean {
-  return /\.(?:xls|xlsx|xlsm|xlsb)$/i.test(fileName);
-}
-
-function hasExcelFileSignature(bytes: Uint8Array): boolean {
-  const isZip = bytes[0] === 0x50
-    && bytes[1] === 0x4b
-    && [0x03, 0x05, 0x07].includes(bytes[2])
-    && [0x04, 0x06, 0x08].includes(bytes[3]);
-  const isOle = bytes[0] === 0xd0
-    && bytes[1] === 0xcf
-    && bytes[2] === 0x11
-    && bytes[3] === 0xe0
-    && bytes[4] === 0xa1
-    && bytes[5] === 0xb1
-    && bytes[6] === 0x1a
-    && bytes[7] === 0xe1;
-
-  return isZip || isOle;
+function resetToStepOne() {
+  requestId += 1;
+  stopWorker();
+  reportController.clear();
+  upload.reset();
 }
 
 function showFileError(message: string) {
-  clearResults();
-  chooseCard.hidden = false;
-  setFileStatus(message, 'error');
-  fileStatus.focus();
+  stopWorker();
+  reportController.clear();
+  upload.setStatus(message, 'error');
+  upload.focusStatus();
 }
 
-async function handleFile(file: File, existingRun?: number) {
-  const runId = existingRun ?? ++runCounter;
-  clearResults();
-  examplePreview.hidden = true;
-  stepAnnouncement.textContent = '';
-  chooseCard.hidden = false;
-  selectedFile.textContent = `Selected file: ${file.name}`;
-  selectedFile.hidden = false;
-  chooseDifferentFile.hidden = false;
-  setFileStatus('Checking your list…', 'loading');
-
-  let decodedCsv: ReturnType<typeof decodeCsvBytes>;
-  try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    if (isExcelFileName(file.name) || hasExcelFileSignature(bytes)) {
-      if (runId === runCounter) {
-        showFileError('This looks like an Excel file. Save it as CSV and try again.');
-      }
-      return;
-    }
-    decodedCsv = decodeCsvBytes(bytes);
-  } catch {
-    if (runId === runCounter) {
-      showFileError('Could not read this file. Check that it is a CSV file, then try again.');
-    }
+function handleWorkerResponse(response: WorkerResponse) {
+  if (response.id !== requestId) return;
+  upload.setCancelVisible(false);
+  if (response.type === 'error') {
+    showFileError(response.message);
     return;
   }
-  if (runId !== runCounter) return;
-
-  const encodingNote = decodedCsv.encoding === 'Windows-1252'
-    ? 'This file was read as Windows-1252 to preserve names.'
-    : '';
-  Papa.parse<ParsedCsvRow>(decodedCsv.text, {
-    header: true,
-    skipEmptyLines: false,
-    delimiter: ',',
-    complete: (results) => {
-      if (runId !== runCounter) return;
-
-      const parsed = normalizeParsedRows(results.data, results.meta.fields ?? []);
-      if (findFatalParseError(results.errors, parsed.rows)) {
-        showFileError(
-          'Some rows do not match the column names. Fix the rows, then try again.',
-        );
-        return;
-      }
-
-      const headers = parsed.headers;
-      if (headers.length === 0) {
-        showFileError('This file is empty. Choose a file with a header row and people.');
-        return;
-      }
-
-      if (headers.some((header) => header.includes(';'))) {
-        showFileError(
-          'This file uses semicolons. Save it as comma-separated CSV and try again.',
-        );
-        return;
-      }
-
-      if (headers.some((header) => header.includes('\t'))) {
-        showFileError(
-          'This file uses tabs. Save it as comma-separated CSV and try again.',
-        );
-        return;
-      }
-
-      const columns = guessColumns(headers);
-      if (!columns.phone && !columns.email) {
-        showFileError('No phone or email column found. Add one, then try again.');
-        return;
-      }
-
-      if (columns.optOutConfidence !== 'high') {
-        requestOptOutResolution(
-          file.name,
-          parsed.rows,
-          headers,
-          columns,
-          encodingNote,
-          parsed.rowsWithExtraValues,
-        );
-        return;
-      }
-
-      renderParsedList(
-        file.name,
-        parsed.rows,
-        headers,
-        columns,
-        `Using the ${columns.optOut} column for opt-outs.`,
-        encodingNote,
-        parsed.rowsWithExtraValues,
-      );
-    },
-    error: () => {
-      if (runId !== runCounter) return;
-      showFileError('Could not read this file. Check that it is a CSV file, then try again.');
-    },
-  });
+  reportController.handleResponse(response);
 }
 
 function processFile(file: File) {
-  examplePreview.hidden = true;
-  selectedFile.textContent = `Selected file: ${file.name}`;
-  selectedFile.hidden = false;
-  chooseDifferentFile.hidden = false;
-  const isCsvByName = file.name.toLowerCase().endsWith('.csv');
-  const isCsvByType = file.type.split(';', 1)[0].trim().toLowerCase() === 'text/csv';
-  if ((!isCsvByName && !isCsvByType) || isExcelFileName(file.name)) {
-    ++runCounter;
-    showFileError(
-      isExcelFileName(file.name)
-        ? 'This looks like an Excel file. Save it as CSV and try again.'
-        : 'Choose a .csv file to continue.',
-    );
-    fileInput.value = '';
+  requestId += 1;
+  stopWorker();
+  reportController.clear();
+  upload.showExample(false);
+  upload.setSelectedFile(file.name);
+  const fileError = getFileError(file);
+  if (fileError) {
+    showFileError(fileError);
     return;
   }
-  handleFile(file);
-  fileInput.value = '';
+
+  const id = requestId;
+  upload.setStatus('Checking your list…', 'loading');
+  processing.start(id, file);
 }
 
-function downloadBucket(bucket: keyof MemberBuckets) {
-  if (!currentBuckets) return;
-  const rows = currentBuckets[bucket];
-  if (rows.length === 0) return;
-
-  const csv = toCsv(rows, currentHeaders);
-  const baseName = currentFileName.replace(/\.csv$/i, '');
-  const suffix =
-    bucket === 'ready' ? 'ready' : bucket === 'needsReview' ? 'needs-review' : 'opted-out';
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `${baseName}-${suffix}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+function resolveOptOut(resolution: Extract<WorkerRequest, { type: 'resolve-opt-out' }>['resolution']) {
+  if (!processing.isActive()) return;
+  upload.setStatus('Checking your list…', 'loading');
+  processing.resolve(requestId, resolution);
 }
 
-fileInput.addEventListener('change', () => {
-  const file = fileInput.files?.[0];
-  if (file) processFile(file);
-});
+function cancelCheck() {
+  if (!processing.isActive()) return;
+  requestId += 1;
+  stopWorker();
+  reportController.clear();
+  upload.setStatus('Check canceled. Choose a file to try again.');
+  upload.focusStatus();
+}
 
-optOutColumnSelect.addEventListener('change', () => {
-  const hasSelection = optOutColumnSelect.value !== '';
-  optOutModeControls.hidden = !hasSelection;
-  useOptOutColumnButton.disabled = !hasSelection;
-  if (hasSelection) optOutModeSelect.value = inferOptOutMode(optOutColumnSelect.value);
-});
-
-confirmNoOptOutsCheckbox.addEventListener('change', () => {
-  confirmNoOptOutsButton.disabled = !confirmNoOptOutsCheckbox.checked;
-});
-
-useOptOutColumnButton.addEventListener('click', useSelectedOptOutColumn);
-confirmNoOptOutsButton.addEventListener('click', confirmNoOptOutColumn);
-
-chooseDifferentFile.addEventListener('click', () => fileInput.click());
-
-sampleButton.addEventListener('click', async () => {
-  examplePreview.hidden = true;
-  const runId = ++runCounter;
-  stepAnnouncement.textContent = '';
-  clearResults();
-  chooseCard.hidden = false;
-  setFileStatus('Loading the sample list…', 'loading');
+async function loadSample() {
+  requestId += 1;
+  stopWorker();
+  reportController.clear();
+  upload.showExample(false);
+  upload.setStatus('Loading the sample list…', 'loading');
+  const id = requestId;
   try {
     const response = await fetch(`${import.meta.env.BASE_URL}sample-members.csv`);
-    if (runId !== runCounter) return;
+    if (id !== requestId) return;
     if (!response.ok) {
       showFileError('Could not load the sample. Choose a CSV file instead.');
       return;
     }
-
-    const csv = await response.text();
-    if (runId !== runCounter) return;
-    const sample = new File([csv], 'sample-members.csv', { type: 'text/csv' });
-    handleFile(sample, runId);
+    const sample = new File([await response.text()], 'sample-members.csv', { type: 'text/csv' });
+    if (id === requestId) processFile(sample);
   } catch {
-    if (runId === runCounter) {
-      showFileError('Could not load the sample. Choose a CSV file instead.');
-    }
+    if (id === requestId) showFileError('Could not load the sample. Choose a CSV file instead.');
   }
-});
-
-changeOptOutButton.addEventListener('click', () => {
-  const current = currentParsedList;
-  const columns = currentColumns;
-  if (!current || !columns) return;
-
-  clearResults();
-  chooseCard.hidden = false;
-  requestOptOutResolution(
-    current.fileName,
-    current.rows,
-    current.headers,
-    columns,
-    current.encodingNote,
-    current.rowsWithExtraValues,
-  );
-});
-
-function enableTransitions() {
-  document.documentElement.classList.add('app-ready');
 }
 
 if (document.readyState === 'complete') {
-  enableTransitions();
+  document.documentElement.classList.add('app-ready');
 } else {
-  window.addEventListener('load', enableTransitions, { once: true });
+  window.addEventListener('load', () => document.documentElement.classList.add('app-ready'), { once: true });
 }
-
-downloadReadyButton.addEventListener('click', () => downloadBucket('ready'));
-downloadReviewButton.addEventListener('click', () => downloadBucket('needsReview'));
-downloadOptedOutButton.addEventListener('click', () => downloadBucket('optedOut'));
-
-wordmark.addEventListener('click', (event) => {
-  if (isModifiedClick(event)) return;
-  event.preventDefault();
-
-  if (resultsCard.hidden) {
-    scrollToTop();
-  } else {
-    showStepOne();
-  }
-});
-
-window.addEventListener('popstate', () => {
-  if (resultsHistoryEntry) showStepOne();
-});
-
-checkAnotherButton.addEventListener('click', (event) => {
-  if (isModifiedClick(event)) return;
-  event.preventDefault();
-  showStepOne();
-});
-
-let dragDepth = 0;
-
-function setDragState(active: boolean) {
-  uploadZone.classList.toggle('is-drag-over', active);
-  uploadPrompt.hidden = active;
-  dropInstruction.hidden = !active;
-}
-
-uploadZone.addEventListener('dragenter', (event) => {
-  event.preventDefault();
-  dragDepth += 1;
-  setDragState(true);
-});
-
-uploadZone.addEventListener('dragover', (event) => {
-  event.preventDefault();
-  setDragState(true);
-});
-
-uploadZone.addEventListener('dragleave', (event) => {
-  event.preventDefault();
-  dragDepth = Math.max(0, dragDepth - 1);
-  if (dragDepth === 0) setDragState(false);
-});
-
-uploadZone.addEventListener('drop', (event) => {
-  event.preventDefault();
-  dragDepth = 0;
-  setDragState(false);
-  const file = event.dataTransfer?.files[0];
-  if (file) processFile(file);
-});
