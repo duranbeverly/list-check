@@ -372,7 +372,7 @@ h3 {
   align-items: stretch;
   background: var(--color-review-tint);
   border-left: 4px solid var(--color-review);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-card);
   color: var(--color-text);
   display: flex;
   flex-direction: column;
@@ -391,9 +391,27 @@ h3 {
   margin: 0;
 }
 
-.opt-out-confidence,
 .opt-out-note {
   color: var(--color-muted);
+}
+
+.opt-out-mode-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.opt-out-confirm-label {
+  align-items: center;
+  display: flex;
+  gap: var(--space-1);
+}
+
+.opt-out-confirm-label input {
+  accent-color: var(--color-brand);
+  flex: 0 0 20px;
+  height: 20px;
+  width: 20px;
 }
 
 .opt-out-setup select {

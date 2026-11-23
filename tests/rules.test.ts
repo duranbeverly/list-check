@@ -58,6 +58,13 @@ describe('cleanPhone', () => {
     });
   });
 
+  it('identifies multiple phone numbers in one cell', () => {
+    expect(cleanPhone('703-200-0027 / 703-200-0028')).toEqual({
+      ok: false,
+      why: 'multiple numbers',
+    });
+  });
+
   // Treat empty and whitespace-only values as missing.
   it.each(['', '   '])('reports %j as missing', (input) => {
     expect(cleanPhone(input)).toEqual({ ok: false, why: 'missing' });
@@ -111,6 +118,29 @@ describe('CSV parsing', () => {
 
     expect(findFatalParseError(results.errors, results.data)).toBeNull();
     expect(toMembers(results.data, guessColumns(results.meta.fields ?? []))).toHaveLength(1);
+  });
+
+  it('does not reject a CSV just because one row has extra values', () => {
+    const results = Papa.parse<RawRow>(
+      'first_name,email,phone,opt_out\nAna,ana@example.com,571-555-0101,No\nBea,bea@example.com,571-555-0102,No,unexpected',
+      { header: true, skipEmptyLines: false, delimiter: ',' },
+    );
+    const rows = results.data.map((row) => {
+      const extraValues = (row as RawRow & { __parsed_extra?: string[] }).__parsed_extra ?? [];
+      const normalized = { ...row };
+      delete (normalized as RawRow & { __parsed_extra?: string[] }).__parsed_extra;
+      normalized['Extra value 1'] = extraValues[0] ?? '';
+      return normalized;
+    });
+    const columns = guessColumns(results.meta.fields ?? []);
+    const members = toMembers(rows, columns, new Set([1]));
+    const buckets = checkList(members, findDuplicates(members));
+
+    expect(findFatalParseError(results.errors, rows)).toBeNull();
+    expect(buckets.ready.map((member) => member.row)).toEqual([2]);
+    expect(buckets.needsReview.map((member) => member.row)).toEqual([3]);
+    expect(buckets.needsReview[0].reasons).toContain('row has extra values');
+    expect(buckets.needsReview[0].original['Extra value 1']).toBe('unexpected');
   });
 });
 
@@ -217,6 +247,7 @@ describe('isOptOut', () => {
 
   it('interprets subscription statuses in the opposite direction from opt-out flags', () => {
     expect(isOptOut('unsubscribed', 'status')).toBe(true);
+    expect(isOptOut('Opted Out', 'status')).toBe(true);
     expect(isOptOut('subscribed', 'status')).toBe(false);
     expect(isOptOut('unknown', 'status')).toMatchObject({ needsReview: true });
   });

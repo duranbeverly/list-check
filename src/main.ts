@@ -36,6 +36,7 @@ const dropInstruction = getRequiredElement('drop-instruction', HTMLElement);
 const chooseCard = getRequiredElement('choose-card', HTMLElement);
 const resultsCard = getRequiredElement('results-card', HTMLElement);
 const sampleButton = getRequiredElement('sample-button', HTMLButtonElement);
+const examplePreview = getRequiredElement('example-preview', HTMLElement);
 const fileStatus = getRequiredElement('file-status', HTMLParagraphElement);
 const fileStatusIcon = getRequiredElement('file-status-icon', SVGSVGElement);
 const loadingSpinner = getRequiredElement('loading-spinner', SVGSVGElement);
@@ -44,13 +45,16 @@ const selectedFile = getRequiredElement('selected-file', HTMLParagraphElement);
 const chooseDifferentFile = getRequiredElement('choose-different-file', HTMLButtonElement);
 const checkedFileName = getRequiredElement('checked-file-name', HTMLParagraphElement);
 const summary = getRequiredElement('summary', HTMLParagraphElement);
-const optOutNote = getRequiredElement('opt-out-note', HTMLParagraphElement);
+const optOutNoteText = getRequiredElement('opt-out-note-text', HTMLSpanElement);
+const changeOptOutButton = getRequiredElement('change-opt-out', HTMLButtonElement);
 const optOutSetup = getRequiredElement('opt-out-setup', HTMLElement);
-const optOutConfidence = getRequiredElement('opt-out-confidence', HTMLParagraphElement);
+const optOutWarning = getRequiredElement('opt-out-warning', HTMLParagraphElement);
 const optOutColumnSelect = getRequiredElement('opt-out-column', HTMLSelectElement);
+const optOutModeControls = getRequiredElement('opt-out-mode-controls', HTMLDivElement);
 const optOutModeSelect = getRequiredElement('opt-out-mode', HTMLSelectElement);
 const useOptOutColumnButton = getRequiredElement('use-opt-out-column', HTMLButtonElement);
 const confirmNoOptOutsButton = getRequiredElement('confirm-no-opt-outs', HTMLButtonElement);
+const confirmNoOptOutsCheckbox = getRequiredElement('confirm-no-opt-outs-check', HTMLInputElement);
 const readyCount = getRequiredElement('ready-count', HTMLSpanElement);
 const reviewCount = getRequiredElement('review-count', HTMLSpanElement);
 const optedOutCount = getRequiredElement('opted-out-count', HTMLSpanElement);
@@ -69,12 +73,26 @@ let runCounter = 0;
 let currentBuckets: MemberBuckets | null = null;
 let currentFileName = '';
 let currentHeaders: string[] = [];
+let currentParsedList: {
+  fileName: string;
+  rows: RawRow[];
+  headers: string[];
+  encodingNote: string;
+  rowsWithExtraValues: ReadonlySet<number>;
+} | null = null;
+let currentColumns: ColumnMapping | null = null;
+let resultsHistoryEntry = false;
 let pendingOptOutResolution: {
   fileName: string;
   rows: RawRow[];
   headers: string[];
   encodingNote: string;
+  rowsWithExtraValues: ReadonlySet<number>;
 } | null = null;
+
+interface ParsedCsvRow extends Record<string, string | string[] | undefined> {
+  __parsed_extra?: string[];
+}
 
 function setFileStatus(message: string, state?: 'error' | 'loading') {
   fileStatusMessage.textContent = message;
@@ -97,13 +115,20 @@ function clearResults() {
   currentBuckets = null;
   currentFileName = '';
   currentHeaders = [];
+  currentParsedList = null;
+  currentColumns = null;
   pendingOptOutResolution = null;
   resultsCard.hidden = true;
   optOutSetup.hidden = true;
+  optOutWarning.textContent = '';
   optOutColumnSelect.replaceChildren(new Option('Choose a column', ''));
   optOutModeSelect.value = 'flag';
+  optOutModeControls.hidden = true;
   useOptOutColumnButton.disabled = true;
-  optOutNote.textContent = '';
+  confirmNoOptOutsCheckbox.checked = false;
+  confirmNoOptOutsButton.disabled = true;
+  optOutNoteText.textContent = '';
+  changeOptOutButton.hidden = true;
   reviewTableBody.replaceChildren();
   reviewTable.hidden = true;
   reviewEmpty.hidden = true;
@@ -123,6 +148,8 @@ function showStepOne() {
   ++runCounter;
   clearResults();
   chooseCard.hidden = false;
+  examplePreview.hidden = false;
+  resultsHistoryEntry = false;
   setFileStatus('');
   stepAnnouncement.textContent = 'Started over. Choose a file to check.';
   selectedFile.textContent = '';
@@ -267,7 +294,8 @@ function renderReport(
   reviewCount.textContent = String(review);
   optedOutCount.textContent = String(optedOut);
   checkedFileName.textContent = fileName;
-  optOutNote.textContent = mappingMessage;
+  optOutNoteText.textContent = mappingMessage;
+  changeOptOutButton.hidden = !currentParsedList;
 
   summary.textContent = `${ready} ready, ${review} to review, ${optedOut} opted out.`;
 
@@ -294,6 +322,10 @@ function renderReport(
 
   chooseCard.hidden = true;
   resultsCard.hidden = false;
+  if (!resultsHistoryEntry) {
+    window.history.pushState({ listCheckStep: 'results' }, '', window.location.href);
+    resultsHistoryEntry = true;
+  }
   resultsHeading.focus({ preventScroll: true });
   resultsHeading.scrollIntoView({
     behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
@@ -308,8 +340,11 @@ function renderParsedList(
   columns: ColumnMapping,
   mappingMessage: string,
   encodingNote: string,
+  rowsWithExtraValues: ReadonlySet<number> = new Set(),
 ) {
-  const members = toMembers(rows, columns);
+  currentParsedList = { fileName, rows, headers, encodingNote, rowsWithExtraValues };
+  currentColumns = columns;
+  const members = toMembers(rows, columns, rowsWithExtraValues);
   const duplicateGroups = findDuplicates(members);
   const buckets = checkList(members, duplicateGroups);
   setFileStatus('');
@@ -327,8 +362,9 @@ function requestOptOutResolution(
   headers: string[],
   columns: ColumnMapping,
   encodingNote: string,
+  rowsWithExtraValues: ReadonlySet<number> = new Set(),
 ) {
-  pendingOptOutResolution = { fileName, rows, headers, encodingNote };
+  pendingOptOutResolution = { fileName, rows, headers, encodingNote, rowsWithExtraValues };
   optOutColumnSelect.replaceChildren(new Option('Choose a column', ''));
   for (const header of headers) {
     const option = document.createElement('option');
@@ -336,12 +372,15 @@ function requestOptOutResolution(
     option.textContent = header;
     optOutColumnSelect.append(option);
   }
-  optOutColumnSelect.value = columns.optOut ?? '';
-  optOutModeSelect.value = columns.optOutMode === 'status' ? 'status' : 'flag';
-  useOptOutColumnButton.disabled = !optOutColumnSelect.value;
-  optOutConfidence.textContent = columns.optOut
-    ? `Possible match (low confidence): ${columns.optOut}. Confirm it or choose another column.`
-    : 'No likely match found. Choose the column that records opt-outs, or confirm there is none.';
+  optOutColumnSelect.value = '';
+  optOutModeSelect.value = 'flag';
+  optOutModeControls.hidden = true;
+  useOptOutColumnButton.disabled = true;
+  optOutWarning.textContent = columns.optOut
+    ? `Possible opt-out column: ${columns.optOut}. Choose it below if it records opt-outs.`
+    : 'We could not identify an opt-out column. Choose one below, or deliberately confirm that this list has no opt-out information.';
+  confirmNoOptOutsCheckbox.checked = false;
+  confirmNoOptOutsButton.disabled = true;
   optOutSetup.hidden = false;
   setFileStatus('');
   optOutColumnSelect.focus();
@@ -363,7 +402,7 @@ function useSelectedOptOutColumn() {
     optOutMode: mode,
     optOutConfidence: 'confirmed',
   };
-  const mappingMessage = `Opt-out column selected: ${selectedColumn} (confirmed).`;
+  const mappingMessage = `Using the ${selectedColumn} column for opt-outs.`;
   pendingOptOutResolution = null;
   optOutSetup.hidden = true;
   renderParsedList(
@@ -373,12 +412,13 @@ function useSelectedOptOutColumn() {
     columns,
     mappingMessage,
     pending.encodingNote,
+    pending.rowsWithExtraValues,
   );
 }
 
 function confirmNoOptOutColumn() {
   const pending = pendingOptOutResolution;
-  if (!pending) return;
+  if (!pending || !confirmNoOptOutsCheckbox.checked) return;
 
   const columns: ColumnMapping = {
     ...guessColumns(pending.headers),
@@ -395,7 +435,77 @@ function confirmNoOptOutColumn() {
     columns,
     'You confirmed this list has no opt-out column.',
     pending.encodingNote,
+    pending.rowsWithExtraValues,
   );
+}
+
+function getUniqueExtraHeaders(headers: string[], count: number): string[] {
+  const used = new Set(headers.map((header) => header.trim().toLowerCase()));
+  const extraHeaders: string[] = [];
+
+  for (let index = 0; index < count; index += 1) {
+    const base = `Extra value ${index + 1}`;
+    let candidate = base;
+    let suffix = 2;
+    while (used.has(candidate.toLowerCase())) {
+      candidate = `${base} (${suffix})`;
+      suffix += 1;
+    }
+    used.add(candidate.toLowerCase());
+    extraHeaders.push(candidate);
+  }
+
+  return extraHeaders;
+}
+
+function normalizeParsedRows(
+  data: ParsedCsvRow[],
+  headers: string[],
+): { rows: RawRow[]; headers: string[]; rowsWithExtraValues: ReadonlySet<number> } {
+  const extraValues = data.map((row) => row.__parsed_extra ?? []);
+  const maxExtraValues = Math.max(0, ...extraValues.map((values) => values.length));
+  const extraHeaders = getUniqueExtraHeaders(headers, maxExtraValues);
+  const rows = data.map((row, rowIndex) => {
+    const normalized: RawRow = {};
+    for (const header of headers) {
+      const value = row[header];
+      normalized[header] = typeof value === 'string' ? value : '';
+    }
+    extraHeaders.forEach((header, index) => {
+      normalized[header] = extraValues[rowIndex][index] ?? '';
+    });
+    return normalized;
+  });
+  const rowsWithExtraValues = new Set(
+    extraValues.flatMap((values, index) => values.length > 0 ? [index] : []),
+  );
+
+  return {
+    rows,
+    headers: [...headers, ...extraHeaders],
+    rowsWithExtraValues,
+  };
+}
+
+function isExcelFileName(fileName: string): boolean {
+  return /\.(?:xls|xlsx|xlsm|xlsb)$/i.test(fileName);
+}
+
+function hasExcelFileSignature(bytes: Uint8Array): boolean {
+  const isZip = bytes[0] === 0x50
+    && bytes[1] === 0x4b
+    && [0x03, 0x05, 0x07].includes(bytes[2])
+    && [0x04, 0x06, 0x08].includes(bytes[3]);
+  const isOle = bytes[0] === 0xd0
+    && bytes[1] === 0xcf
+    && bytes[2] === 0x11
+    && bytes[3] === 0xe0
+    && bytes[4] === 0xa1
+    && bytes[5] === 0xb1
+    && bytes[6] === 0x1a
+    && bytes[7] === 0xe1;
+
+  return isZip || isOle;
 }
 
 function showFileError(message: string) {
@@ -408,6 +518,7 @@ function showFileError(message: string) {
 async function handleFile(file: File, existingRun?: number) {
   const runId = existingRun ?? ++runCounter;
   clearResults();
+  examplePreview.hidden = true;
   stepAnnouncement.textContent = '';
   chooseCard.hidden = false;
   selectedFile.textContent = `Selected file: ${file.name}`;
@@ -417,7 +528,14 @@ async function handleFile(file: File, existingRun?: number) {
 
   let decodedCsv: ReturnType<typeof decodeCsvBytes>;
   try {
-    decodedCsv = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (isExcelFileName(file.name) || hasExcelFileSignature(bytes)) {
+      if (runId === runCounter) {
+        showFileError('This looks like an Excel file. Save it as CSV and try again.');
+      }
+      return;
+    }
+    decodedCsv = decodeCsvBytes(bytes);
   } catch {
     if (runId === runCounter) {
       showFileError('Could not read this file. Check that it is a CSV file, then try again.');
@@ -429,21 +547,22 @@ async function handleFile(file: File, existingRun?: number) {
   const encodingNote = decodedCsv.encoding === 'Windows-1252'
     ? 'This file was read as Windows-1252 to preserve names.'
     : '';
-  Papa.parse<Record<string, string>>(decodedCsv.text, {
+  Papa.parse<ParsedCsvRow>(decodedCsv.text, {
     header: true,
     skipEmptyLines: false,
     delimiter: ',',
     complete: (results) => {
       if (runId !== runCounter) return;
 
-      if (findFatalParseError(results.errors, results.data)) {
+      const parsed = normalizeParsedRows(results.data, results.meta.fields ?? []);
+      if (findFatalParseError(results.errors, parsed.rows)) {
         showFileError(
           'Some rows do not match the column names. Fix the rows, then try again.',
         );
         return;
       }
 
-      const headers = results.meta.fields ?? [];
+      const headers = parsed.headers;
       if (headers.length === 0) {
         showFileError('This file is empty. Choose a file with a header row and people.');
         return;
@@ -470,17 +589,25 @@ async function handleFile(file: File, existingRun?: number) {
       }
 
       if (columns.optOutConfidence !== 'high') {
-        requestOptOutResolution(file.name, results.data, headers, columns, encodingNote);
+        requestOptOutResolution(
+          file.name,
+          parsed.rows,
+          headers,
+          columns,
+          encodingNote,
+          parsed.rowsWithExtraValues,
+        );
         return;
       }
 
       renderParsedList(
         file.name,
-        results.data,
+        parsed.rows,
         headers,
         columns,
-        `Opt-out column recognized with high confidence: ${columns.optOut}.`,
+        `Using the ${columns.optOut} column for opt-outs.`,
         encodingNote,
+        parsed.rowsWithExtraValues,
       );
     },
     error: () => {
@@ -491,12 +618,19 @@ async function handleFile(file: File, existingRun?: number) {
 }
 
 function processFile(file: File) {
+  examplePreview.hidden = true;
   selectedFile.textContent = `Selected file: ${file.name}`;
   selectedFile.hidden = false;
   chooseDifferentFile.hidden = false;
-  if (!file.name.toLowerCase().endsWith('.csv')) {
+  const isCsvByName = file.name.toLowerCase().endsWith('.csv');
+  const isCsvByType = file.type.split(';', 1)[0].trim().toLowerCase() === 'text/csv';
+  if ((!isCsvByName && !isCsvByType) || isExcelFileName(file.name)) {
     ++runCounter;
-    showFileError('Choose a .csv file to continue.');
+    showFileError(
+      isExcelFileName(file.name)
+        ? 'This looks like an Excel file. Save it as CSV and try again.'
+        : 'Choose a .csv file to continue.',
+    );
     fileInput.value = '';
     return;
   }
@@ -528,10 +662,14 @@ fileInput.addEventListener('change', () => {
 });
 
 optOutColumnSelect.addEventListener('change', () => {
-  useOptOutColumnButton.disabled = !optOutColumnSelect.value;
-  if (optOutColumnSelect.value) {
-    optOutModeSelect.value = inferOptOutMode(optOutColumnSelect.value);
-  }
+  const hasSelection = optOutColumnSelect.value !== '';
+  optOutModeControls.hidden = !hasSelection;
+  useOptOutColumnButton.disabled = !hasSelection;
+  if (hasSelection) optOutModeSelect.value = inferOptOutMode(optOutColumnSelect.value);
+});
+
+confirmNoOptOutsCheckbox.addEventListener('change', () => {
+  confirmNoOptOutsButton.disabled = !confirmNoOptOutsCheckbox.checked;
 });
 
 useOptOutColumnButton.addEventListener('click', useSelectedOptOutColumn);
@@ -540,6 +678,7 @@ confirmNoOptOutsButton.addEventListener('click', confirmNoOptOutColumn);
 chooseDifferentFile.addEventListener('click', () => fileInput.click());
 
 sampleButton.addEventListener('click', async () => {
+  examplePreview.hidden = true;
   const runId = ++runCounter;
   stepAnnouncement.textContent = '';
   clearResults();
@@ -562,6 +701,23 @@ sampleButton.addEventListener('click', async () => {
       showFileError('Could not load the sample. Choose a CSV file instead.');
     }
   }
+});
+
+changeOptOutButton.addEventListener('click', () => {
+  const current = currentParsedList;
+  const columns = currentColumns;
+  if (!current || !columns) return;
+
+  clearResults();
+  chooseCard.hidden = false;
+  requestOptOutResolution(
+    current.fileName,
+    current.rows,
+    current.headers,
+    columns,
+    current.encodingNote,
+    current.rowsWithExtraValues,
+  );
 });
 
 function enableTransitions() {
@@ -587,6 +743,10 @@ wordmark.addEventListener('click', (event) => {
   } else {
     showStepOne();
   }
+});
+
+window.addEventListener('popstate', () => {
+  if (resultsHistoryEntry) showStepOne();
 });
 
 checkAnotherButton.addEventListener('click', (event) => {

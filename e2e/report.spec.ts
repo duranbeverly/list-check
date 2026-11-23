@@ -96,22 +96,28 @@ test('blocks a ready list until the organizer confirms opt-out handling', async 
 
   await expect(page.locator('#opt-out-setup')).toBeVisible();
   await expect(page.locator('#opt-out-warning')).toHaveText(
-    "We couldn't find an opt-out column. Choose it below, or confirm this list has none.",
+    'We could not identify an opt-out column. Choose one below, or deliberately confirm that this list has no opt-out information.',
   );
+  await expect(page.locator('#example-preview')).toBeHidden();
   await expect(page.locator('#opt-out-column')).toBeFocused();
   await expect(page.locator('#results-card')).toBeHidden();
   await expect(page.locator('#download-ready')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'This list has no opt-outs' })).toBeDisabled();
 
+  await page.getByRole('checkbox', {
+    name: 'I checked: this list has no opt-out information.',
+  }).check();
+  await expect(page.getByRole('button', { name: 'This list has no opt-outs' })).toBeEnabled();
   await page.getByRole('button', { name: 'This list has no opt-outs' }).click();
   await expect(page.locator('#opt-out-setup')).toBeHidden();
-  await expect(page.locator('#opt-out-note')).toHaveText(
+  await expect(page.locator('#opt-out-note-text')).toHaveText(
     'You confirmed this list has no opt-out column.',
   );
   await expect(page.locator('#ready-count')).toHaveText('1');
   await expect(page.getByRole('button', { name: 'Download ready list (1)' })).toBeVisible();
 });
 
-test('prefills a low-confidence opt-out guess and requires confirmation', async ({ page }) => {
+test('requires a deliberate column choice for a low-confidence opt-out guess', async ({ page }) => {
   await page.locator('#file-input').setInputFiles({
     name: 'custom-opt-outs.csv',
     mimeType: 'text/csv',
@@ -120,17 +126,22 @@ test('prefills a low-confidence opt-out guess and requires confirmation', async 
     ),
   });
 
-  await expect(page.locator('#opt-out-confidence')).toContainText(
-    'Possible match (low confidence): custom_opt_out_flag',
+  await expect(page.locator('#opt-out-warning')).toContainText(
+    'Possible opt-out column: custom_opt_out_flag',
   );
-  await expect(page.locator('#opt-out-column')).toHaveValue('custom_opt_out_flag');
+  await expect(page.locator('#opt-out-column')).toHaveValue('');
+  await expect(page.locator('#opt-out-mode-controls')).toBeHidden();
+  await expect(page.locator('#use-opt-out-column')).toBeDisabled();
+
+  await page.locator('#opt-out-column').selectOption('custom_opt_out_flag');
+  await expect(page.locator('#opt-out-mode-controls')).toBeVisible();
   await expect(page.locator('#use-opt-out-column')).toBeEnabled();
   await expect(page.locator('#results-card')).toBeHidden();
 
   await page.getByRole('button', { name: 'Use this column' }).click();
   await expect(page.locator('#ready-count')).toHaveText('1');
-  await expect(page.locator('#opt-out-note')).toHaveText(
-    'Opt-out column selected: custom_opt_out_flag (confirmed).',
+  await expect(page.locator('#opt-out-note-text')).toHaveText(
+    'Using the custom_opt_out_flag column for opt-outs.',
   );
 });
 
@@ -149,6 +160,119 @@ test('interprets Action Network subscription statuses safely', async ({ page }) 
   await expect(page.locator('#review-table-body')).toContainText(
     'Subscription status "pending" is unclear. Confirm permission before texting.',
   );
+});
+
+test('treats "Opted Out" in an sms_opt_out column as opted out', async ({ page }) => {
+  await page.locator('#file-input').setInputFiles({
+    name: 'sms-opt-outs.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'first_name,email,phone,sms_opt_out\nAna,ana@example.com,571-555-0101,Opted Out\nBea,bea@example.com,571-555-0102,No',
+    ),
+  });
+
+  await expect(page.locator('#ready-count')).toHaveText('1');
+  await expect(page.locator('#opted-out-count')).toHaveText('1');
+});
+
+test('keeps an extra-value row in review and processes the other rows', async ({ page }) => {
+  await page.locator('#file-input').setInputFiles({
+    name: 'ragged.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'first_name,email,phone,opt_out\nAna,ana@example.com,571-555-0101,No\nBea,bea@example.com,571-555-0102,No,unexpected',
+    ),
+  });
+
+  await expect(page.locator('#ready-count')).toHaveText('1');
+  await expect(page.locator('#review-count')).toHaveText('1');
+  await expect(page.locator('#review-table-body')).toContainText(
+    'This row has extra values. Check the columns.',
+  );
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download to review (1)' }).click();
+  const download = await downloadPromise;
+  const path = await download.path();
+  if (!path) throw new Error('The review download did not produce a file');
+  const downloadedCsv = await readFile(path, 'utf8');
+  expect(downloadedCsv).toContain('Extra value 1');
+  expect(downloadedCsv).toContain('unexpected');
+});
+
+test('accepts extensionless text/csv and rejects Excel files', async ({ page }) => {
+  await page.locator('#file-input').setInputFiles({
+    name: 'members',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'first_name,email,phone,opt_out\nAna,ana@example.com,571-555-0101,No',
+    ),
+  });
+  await expect(page.locator('#ready-count')).toHaveText('1');
+
+  await page.locator('#file-input').setInputFiles({
+    name: 'members.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: Buffer.from('not a csv'),
+  });
+  await expect(page.locator('#file-status')).toHaveText(
+    'This looks like an Excel file. Save it as CSV and try again.',
+  );
+});
+
+test('explains multiple phone numbers in one cell', async ({ page }) => {
+  await page.locator('#file-input').setInputFiles({
+    name: 'multiple-phones.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'first_name,email,phone,opt_out\nAna,ana@example.com,703-200-0027 / 703-200-0028,No',
+    ),
+  });
+
+  await expect(page.locator('#review-table-body')).toContainText(
+    'Two numbers in one cell. Keep one.',
+  );
+});
+
+test('lets the browser Back button return from results to Step 1', async ({ page }) => {
+  await page.getByRole('button', { name: 'No file handy? Try a sample list' }).click();
+  await expect(page.locator('#results-card')).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('#results-card')).toBeHidden();
+  await expect(page.locator('#choose-card')).toBeVisible();
+});
+
+test('clears the opt-out warning after a later file has a recognized column', async ({ page }) => {
+  const input = page.locator('#file-input');
+  await input.setInputFiles({
+    name: 'unknown-opt-outs.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('first_name,email,phone\nAna,ana@example.com,571-555-0101'),
+  });
+  await expect(page.locator('#opt-out-warning')).not.toBeEmpty();
+
+  await input.setInputFiles({
+    name: 'known-opt-outs.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'first_name,email,phone,opt_out\nBea,bea@example.com,571-555-0102,No',
+    ),
+  });
+  await expect(page.locator('#opt-out-setup')).toBeHidden();
+  await expect(page.locator('#opt-out-warning')).toBeEmpty();
+});
+
+test('allows changing the opt-out column from the results', async ({ page }) => {
+  await page.locator('#file-input').setInputFiles({
+    name: 'change-opt-out.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(
+      'first_name,email,phone,opt_out\nAna,ana@example.com,571-555-0101,No',
+    ),
+  });
+  await page.getByRole('button', { name: 'Change' }).click();
+  await expect(page.locator('#results-card')).toBeHidden();
+  await expect(page.locator('#opt-out-setup')).toBeVisible();
+  await expect(page.locator('#opt-out-column')).toHaveValue('');
 });
 
 test('opts out everyone who shares a phone with someone who says STOP', async ({ page }) => {
@@ -206,9 +330,8 @@ test('focuses and scrolls the results heading into view on a phone', async ({ pa
 
 test('logo returns to Step 1 without reloading and does not reset there', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  let mainFrameNavigations = 0;
-  page.on('framenavigated', (frame) => {
-    if (frame === page.mainFrame()) mainFrameNavigations += 1;
+  await page.evaluate(() => {
+    (window as Window & { noReload?: boolean }).noReload = true;
   });
   const startingUrl = page.url();
 
@@ -231,7 +354,9 @@ test('logo returns to Step 1 without reloading and does not reset there', async 
     'Started over. Choose a file to check.',
   );
   expect(page.url()).toBe(startingUrl);
-  expect(mainFrameNavigations).toBe(0);
+  expect(
+    await page.evaluate(() => (window as Window & { noReload?: boolean }).noReload),
+  ).toBe(true);
 });
 
 test('downloads five ready members with why as the last column', async ({ page }) => {
@@ -612,6 +737,9 @@ test('accepts a two-column CSV ending in a newline and confirms opt-out handling
 
   await expect(page.locator('#file-status')).toBeHidden();
   await expect(page.locator('#opt-out-setup')).toBeVisible();
+  await page.getByRole('checkbox', {
+    name: 'I checked: this list has no opt-out information.',
+  }).check();
   await page.getByRole('button', { name: 'This list has no opt-outs' }).click();
   await expect(page.locator('#ready-count')).toHaveText('1');
   await expect(page.locator('#summary')).toHaveText(
@@ -785,6 +913,8 @@ test('supports keyboard navigation with a visible focus outline', async ({ page 
 
   const readyButton = page.getByRole('button', { name: 'Download ready list (5)' });
   await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Change' })).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(readyButton).toBeFocused();
   expect(await readyButton.evaluate((button) => getComputedStyle(button).outlineStyle)).toBe('solid');
 
@@ -851,10 +981,12 @@ test('fits a phone-width screen at 200% zoom and supports dark mode', async ({ p
   expect(pageBackground).not.toBe(cardBackground);
 });
 
-test('has no axe accessibility violations', async ({ page }) => {
-  const chooserResults = await new AxeBuilder({ page }).analyze();
-  expect(chooserResults.violations).toEqual([]);
+test('has no axe accessibility violations on Step 1', async ({ page }) => {
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
+});
 
+test('has no axe accessibility violations on the results', async ({ page }) => {
   await page.getByRole('button', { name: 'No file handy? Try a sample list' }).click();
   await expect(page.locator('#summary')).toHaveText(
     '5 ready, 8 to review, 3 opted out.',

@@ -23,6 +23,9 @@ export function cleanPhone(value: string, country: CountryCode = 'US'): PhoneRes
   if (/^\d(?:\.\d+)?e\+\d+$/i.test(trimmedValue)) {
     return { ok: false, why: 'Excel shortened this number' };
   }
+  if ((trimmedValue.match(/\+?\d[\d().\s-]{5,}\d/g) ?? []).length > 1) {
+    return { ok: false, why: 'multiple numbers' };
+  }
 
   const parsedPhone = parsePhoneNumberFromString(trimmedValue, country);
   const lengthIssue = validatePhoneNumberLength(trimmedValue, country);
@@ -88,7 +91,11 @@ export function isOptOut(value: string, mode: OptOutMode = 'flag'): OptOutDecisi
 }
 
 // Turn parsed rows into members while keeping their file positions and originals.
-export function toMembers(rows: RawRow[], columns: ColumnMapping): Member[] {
+export function toMembers(
+  rows: RawRow[],
+  columns: ColumnMapping,
+  rowsWithExtraValues: ReadonlySet<number> = new Set(),
+): Member[] {
   return rows.flatMap((original, index) => {
     const row = index + 2;
     if (isBlankRow(original)) {
@@ -105,6 +112,7 @@ export function toMembers(rows: RawRow[], columns: ColumnMapping): Member[] {
       optOut: readValue(columns.optOut),
       optOutMode: columns.optOutMode,
       phone: columns.phone ? cleanPhone(readValue(columns.phone)) : null,
+      hasExtraValues: rowsWithExtraValues.has(index),
       original,
     }];
   });
@@ -117,6 +125,9 @@ export function findFatalParseError(
 ): { code: string; row?: number } | null {
   const hasData = rows.some((row) => !isBlankRow(row));
   return errors.find((error) => {
+    if (error.code === 'TooManyFields') {
+      return false;
+    }
     if (error.code === 'UndetectableDelimiter' && !hasData) {
       return false;
     }
@@ -250,6 +261,9 @@ export function checkList(members: Member[], duplicateGroups: DuplicateGroup[]):
     if (member.phone && !member.phone.ok) {
       reasons.push(`phone ${member.phone.why}`);
     }
+    if (member.hasExtraValues) {
+      reasons.push('row has extra values');
+    }
     if (decision !== true && typeof decision === 'object') {
       reasons.push(decision.why);
     }
@@ -310,6 +324,12 @@ export function formatReviewReason(reason: string): string {
   }
   if (reason === 'phone international number') {
     return 'International number. Check your texting tool supports it.';
+  }
+  if (reason === 'phone multiple numbers') {
+    return 'Two numbers in one cell. Keep one.';
+  }
+  if (reason === 'row has extra values') {
+    return 'This row has extra values. Check the columns.';
   }
 
   const duplicateEmail = reason.match(/^same email as row (\d+)$/);

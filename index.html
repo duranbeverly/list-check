@@ -73,7 +73,7 @@
           <span>Runs on your computer. Nothing is uploaded.</span>
         </p>
 
-        <section class="example-preview" aria-labelledby="example-result-title">
+        <section  id="example-preview" class="example-preview" aria-labelledby="example-result-title">
           <h2 id="example-result-title" class="example-heading">Example result</h2>
           <div class="example-tiles">
             <div class="example-tile example-tile--ready">
@@ -105,7 +105,7 @@
 
         <div id="upload-zone" class="upload-zone">
           <!-- Keep the real file input keyboard and screen-reader accessible. -->
-          <input id="file-input" class="visually-hidden" type="file" accept=".csv" aria-describedby="upload-hint">
+          <input id="file-input" class="visually-hidden" type="file" accept=".csv,text/csv" aria-describedby="upload-hint">
           <label class="upload-content" for="file-input">
             <svg class="upload-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2" />
@@ -129,31 +129,35 @@
             </svg>
             <span id="file-status-message"></span>
           </p>
-          <section id="opt-out-setup" class="opt-out-setup" aria-labelledby="opt-out-setup-title" hidden>
-            <h2 id="opt-out-setup-title">Opt-out check needed</h2>
-            <p id="opt-out-warning" role="alert">
-              We couldn't find an opt-out column. Choose it below, or confirm this list has none.
-            </p>
-            <p id="opt-out-confidence" class="opt-out-confidence"></p>
-            <label for="opt-out-column">Opt-out column</label>
-            <select id="opt-out-column">
-              <option value="">Choose a column</option>
-            </select>
-            <label for="opt-out-mode">How does this column work?</label>
-            <select id="opt-out-mode">
-              <option value="flag">A flag: yes means opted out</option>
-              <option value="status">A status: subscribed or unsubscribed</option>
-            </select>
-            <div class="opt-out-actions">
-              <button id="use-opt-out-column" class="button-primary" type="button" disabled>
-                Use this column
-              </button>
-              <button id="confirm-no-opt-outs" class="button-secondary" type="button">
-                This list has no opt-outs
-              </button>
-            </div>
-          </section>
           <button id="sample-button" class="link-button sample-link" type="button">No file handy? Try a sample list</button>
+        </div>
+      </section>
+
+      <section id="opt-out-setup" class="card opt-out-setup" aria-labelledby="opt-out-setup-title" hidden>
+        <h2 id="opt-out-setup-title">Opt-out check needed</h2>
+        <p id="opt-out-warning" role="alert"></p>
+        <label for="opt-out-column">Opt-out column</label>
+        <select id="opt-out-column">
+          <option value="">Choose a column</option>
+        </select>
+        <div id="opt-out-mode-controls" class="opt-out-mode-controls" hidden>
+          <label for="opt-out-mode">How does this column work?</label>
+          <select id="opt-out-mode">
+            <option value="flag">A flag: yes means opted out</option>
+            <option value="status">A status: subscribed or unsubscribed</option>
+          </select>
+        </div>
+        <label class="opt-out-confirm-label" for="confirm-no-opt-outs-check">
+          <input id="confirm-no-opt-outs-check" type="checkbox">
+          I checked: this list has no opt-out information.
+        </label>
+        <div class="opt-out-actions">
+          <button id="use-opt-out-column" class="button-primary" type="button" disabled>
+            Use this column
+          </button>
+          <button id="confirm-no-opt-outs" class="button-secondary" type="button" disabled>
+            This list has no opt-outs
+          </button>
         </div>
       </section>
 
@@ -161,7 +165,10 @@
       <section id="results-card" class="card" aria-labelledby="results-title" hidden>
         <h1 id="results-title" class="results-title" tabindex="-1">Step 2 · Your results</h1>
         <p id="checked-file-name" class="checked-file-name"></p>
-        <p id="opt-out-note" class="opt-out-note"></p>
+        <p id="opt-out-note" class="opt-out-note">
+          <span id="opt-out-note-text"></span>
+          <button id="change-opt-out" class="link-button" type="button" hidden>Change</button>
+        </p>
         <p id="summary" class="visually-hidden" aria-live="polite"></p>
 
         <div class="stat-tiles" aria-label="List results">

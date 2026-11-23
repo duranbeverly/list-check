@@ -9,7 +9,8 @@ export type PhoneResult =
       | 'not a valid number'
       | 'has extension'
       | 'Excel shortened this number'
-      | 'international number';
+      | 'international number'
+      | 'multiple numbers';
   };
 
 export type OptOutDecision = boolean | { needsReview: true; why: string };
@@ -38,6 +39,7 @@ export interface Member {
   optOut: string;
   optOutMode: OptOutMode;
   phone: PhoneResult | null;
+  hasExtraValues: boolean;
   original: RawRow;
 }
 
