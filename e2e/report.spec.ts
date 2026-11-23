@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import Papa from 'papaparse';
 
@@ -77,6 +78,65 @@ test('disables downloads before a file is checked', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Download ready list (to import)' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Download people to review (to fix)' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Download opt-outs (to keep out)' })).toBeDisabled();
+});
+
+// Keep keyboard focus visible and the buttons in a useful order.
+test('supports keyboard navigation with a visible focus outline', async ({ page }) => {
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#file-input')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Try it with a sample list' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#summary')).toContainText('5 people are ready to import.');
+
+  const readyButton = page.getByRole('button', { name: 'Download ready list (to import)' });
+  await page.keyboard.press('Tab');
+  await expect(readyButton).toBeFocused();
+  expect(await readyButton.evaluate((button) => getComputedStyle(button).outlineStyle)).toBe('solid');
+
+  const readyDownload = page.waitForEvent('download');
+  await page.keyboard.press('Space');
+  await readyDownload;
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Download people to review (to fix)' })).toBeFocused();
+  const reviewDownload = page.waitForEvent('download');
+  await page.keyboard.press('Enter');
+  await reviewDownload;
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Download opt-outs (to keep out)' })).toBeFocused();
+  const optedOutDownload = page.waitForEvent('download');
+  await page.keyboard.press('Space');
+  await optedOutDownload;
+});
+
+// Keep text and controls usable at phone width and 200% zoom.
+test('fits a phone-width screen at 200% zoom with large tap targets', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Try it with a sample list' }).click();
+  await expect(page.locator('#summary')).toContainText('5 people are ready to import.');
+
+  const tapTargetHeights = await page.locator('#file-input, #app > button').evaluateAll((elements) =>
+    elements.map((element) => element.getBoundingClientRect().height),
+  );
+  expect(tapTargetHeights.every((height) => height >= 44)).toBe(true);
+
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = '200%';
+  });
+  const pageWidths = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(pageWidths.scroll).toBeLessThanOrEqual(pageWidths.client);
+});
+
+// Catch accessibility issues in the rendered report.
+test('has no axe accessibility violations', async ({ page }) => {
+  await page.getByRole('button', { name: 'Try it with a sample list' }).click();
+  await expect(page.locator('#summary')).toContainText('5 people are ready to import.');
+
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
 });
 
 // Ignore a sample request if a newer file is checked first.

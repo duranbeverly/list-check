@@ -9,7 +9,8 @@
   </head>
   <body>
     <!-- Let visitors upload a CSV or try the sample list. -->
-    <div id="app">
+    <main id="app">
+      <h1>List Check</h1>
       <label for="file-input">Select a CSV file</label>
       <input type="file" id="file-input" accept=".csv">
       <button type="button" id="sample-button">Try it with a sample list</button>
@@ -23,7 +24,7 @@
       <button type="button" id="download-opted-out" disabled>Download opt-outs (to keep out)</button>
       <!-- Explain where the list is processed. -->
       <p id="privacy-note">Checked on your computer. Nothing was uploaded.</p>
-    </div>
+    </main>
     <!-- Start the app. -->
     <script type="module" src="/src/main.ts"></script>
   </body>
